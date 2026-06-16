@@ -6,9 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 
+import '../../app/router.dart';
 import '../../core/data/models.dart';
 import '../../core/data/portfolio_data.dart';
 import '../../core/responsive/responsive.dart';
@@ -37,9 +37,40 @@ class TerminalOverlay extends StatefulWidget {
 class _TerminalOverlayState extends State<TerminalOverlay> {
   final _controller = TextEditingController();
   final _scrollCtrl = ScrollController();
-  final _focusNode = FocusNode();
-  final _kbFocus = FocusNode();
   final List<_Line> _lines = [];
+
+  // Intercepts Esc/Enter/arrows/Tab before the TextField sees them so those
+  // keys work correctly even while the user is typing.
+  late final FocusNode _inputFocus = FocusNode(
+    debugLabel: 'terminal-input',
+    onKeyEvent: (node, event) {
+      if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+        return KeyEventResult.ignored;
+      }
+      final k = event.logicalKey;
+      if (k == LogicalKeyboardKey.escape) {
+        context.read<ConsoleCubit>().dismiss();
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.arrowUp) {
+        _historyUp();
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.arrowDown) {
+        _historyDown();
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.tab) {
+        _autocomplete();
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.enter || k == LogicalKeyboardKey.numpadEnter) {
+        _submit(_controller.text);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    },
+  );
   final List<String> _history = [];
   int _histIdx = -1;
   final DateTime _startTime = DateTime.now();
@@ -52,7 +83,7 @@ class _TerminalOverlayState extends State<TerminalOverlay> {
     _print('Aurora Terminal v2.0', AppColors.violet);
     _print('Type "help" for commands. Tab autocomplete. ↑↓ history.', AppColors.textTertiary);
     _print('', AppColors.textSecondary);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _inputFocus.requestFocus());
   }
 
   void _scrollToBottom() {
@@ -101,7 +132,7 @@ class _TerminalOverlayState extends State<TerminalOverlay> {
       if (s != null) {
         _print('Navigating to $target…', AppColors.mint);
         context.read<ScrollIntentCubit>().request(s);
-        context.go('/');
+        appRouter.go('/');
         context.read<ConsoleCubit>().dismiss();
       } else {
         _print('Unknown section: $target. Try: ${map.keys.join(", ")}', AppColors.pink);
@@ -253,7 +284,7 @@ class _TerminalOverlayState extends State<TerminalOverlay> {
 
       case 'lab':
         _print('Opening the Lab…', AppColors.mint);
-        context.go('/lab');
+        appRouter.go('/lab');
         context.read<ConsoleCubit>().dismiss();
 
       case 'clear':
@@ -375,8 +406,7 @@ class _TerminalOverlayState extends State<TerminalOverlay> {
   void dispose() {
     _controller.dispose();
     _scrollCtrl.dispose();
-    _focusNode.dispose();
-    _kbFocus.dispose();
+    _inputFocus.dispose();
     super.dispose();
   }
 
@@ -400,19 +430,7 @@ class _TerminalOverlayState extends State<TerminalOverlay> {
                 borderRadius: BorderRadius.circular(Corners.lg),
                 border: Border.all(color: AppColors.borderStrong),
               ),
-              child: KeyboardListener(
-                focusNode: _kbFocus,
-                autofocus: false,
-                onKeyEvent: (e) {
-                  if (e is! KeyDownEvent && e is! KeyRepeatEvent) return;
-                  if (e.logicalKey == LogicalKeyboardKey.arrowUp) _historyUp();
-                  if (e.logicalKey == LogicalKeyboardKey.arrowDown) _historyDown();
-                  if (e.logicalKey == LogicalKeyboardKey.tab) _autocomplete();
-                  if (e.logicalKey == LogicalKeyboardKey.escape) {
-                    context.read<ConsoleCubit>().dismiss();
-                  }
-                },
-                child: Column(
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Title bar
@@ -466,7 +484,8 @@ class _TerminalOverlayState extends State<TerminalOverlay> {
                           Expanded(
                             child: TextField(
                               controller: _controller,
-                              focusNode: _focusNode,
+                              focusNode: _inputFocus,
+                              autofocus: true,
                               style: AppText.mono(size: 13, color: AppColors.textPrimary, spacing: 0),
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
@@ -481,7 +500,6 @@ class _TerminalOverlayState extends State<TerminalOverlay> {
                     ),
                   ],
                 ),
-              ),
             ),
           ),
         ),

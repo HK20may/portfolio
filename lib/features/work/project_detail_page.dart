@@ -12,6 +12,7 @@ import '../../shared/widgets/magnetic_button.dart';
 import '../../shared/widgets/pills.dart';
 import '../../shared/cursor/cursor_scope.dart';
 import '../home/sections/work_section.dart' show ProjectVisual;
+import '../lab/monte_carlo/monte_carlo_sim.dart';
 
 class ProjectDetailPage extends StatelessWidget {
   const ProjectDetailPage({super.key, required this.id});
@@ -112,6 +113,15 @@ class _Detail extends StatelessWidget {
           ),
         ),
         const SizedBox(height: Insets.xxl),
+        if (project.id == 'stock-prediction') ...[
+          Text(
+            'Live Demo',
+            style: AppText.display(size: 22, weight: FontWeight.w700),
+          ),
+          const SizedBox(height: Insets.lg),
+          const MonteCarloSim(),
+          const SizedBox(height: Insets.xxl),
+        ],
         Text(
           'Highlights',
           style: AppText.display(size: 22, weight: FontWeight.w700),

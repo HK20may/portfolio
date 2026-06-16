@@ -113,8 +113,9 @@ class _OverlayBody extends StatelessWidget {
     // Material is required by TextField inside the overlays.
     return Material(
       type: MaterialType.transparency,
+      // behavior: opaque blocks the scrim below from receiving hits.
+      // No onTap here so inner command/button GestureDetectors win the arena.
       child: GestureDetector(
-        onTap: () {}, // absorb taps on the overlay itself
         behavior: HitTestBehavior.opaque,
         child: _buildView(context),
       ),

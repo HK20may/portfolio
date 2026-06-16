@@ -3,8 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
+import '../../app/router.dart';
 import '../../core/data/portfolio_data.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_colors.dart';
@@ -38,25 +38,60 @@ class CommandPalette extends StatefulWidget {
 class _CommandPaletteState extends State<CommandPalette> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final _focusNode = FocusNode();    // search TextField focus
-  final _kbFocusNode = FocusNode();  // KeyboardListener focus
   String _query = '';
   int _selected = 0;
 
   late final List<_Command> _allCommands;
 
+  // Intercepts Esc/arrows/Enter before the TextField sees them so those keys
+  // work even while typing (arrow navigation, Esc-to-close, Enter-to-run).
+  late final FocusNode _searchFocus = FocusNode(
+    debugLabel: 'palette-search',
+    onKeyEvent: (node, event) {
+      if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+        return KeyEventResult.ignored;
+      }
+      final k = event.logicalKey;
+      if (k == LogicalKeyboardKey.escape) {
+        context.read<ConsoleCubit>().dismiss();
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.arrowDown) {
+        _move(1);
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.arrowUp) {
+        _move(-1);
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.enter || k == LogicalKeyboardKey.numpadEnter) {
+        final list = _filtered;
+        if (list.isNotEmpty) list[_selected].action(context);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    },
+  );
+
+  bool _commandsBuilt = false;
+
   @override
   void initState() {
     super.initState();
+    // Explicitly steal focus after the first frame so the TextField wins even
+    // when AppShell's Focus(autofocus:true) already holds it.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
+      if (mounted) _searchFocus.requestFocus();
     });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _allCommands = _buildCommands(context);
+    if (!_commandsBuilt) {
+      _commandsBuilt = true;
+      _allCommands = _buildCommands(context);
+    }
   }
 
   List<_Command> _buildCommands(BuildContext ctx) {
@@ -64,7 +99,7 @@ class _CommandPaletteState extends State<CommandPalette> {
 
     void navTo(Section s) {
       ctx.read<ScrollIntentCubit>().request(s);
-      ctx.go('/');
+      appRouter.go('/');
       ctx.read<ConsoleCubit>().dismiss();
     }
 
@@ -75,10 +110,10 @@ class _CommandPaletteState extends State<CommandPalette> {
       _Command(icon: Icons.work_outline_rounded, label: 'Work', hint: 'Navigate', action: (_) => navTo(Section.work)),
       _Command(icon: Icons.history_edu_rounded, label: 'Experience', hint: 'Navigate', action: (_) => navTo(Section.experience)),
       _Command(icon: Icons.mail_outline_rounded, label: 'Contact', hint: 'Navigate', action: (_) => navTo(Section.contact)),
-      _Command(icon: Icons.science_outlined, label: 'Open Lab', hint: 'Route', action: (c) { c.go('/lab'); c.read<ConsoleCubit>().dismiss(); }),
+      _Command(icon: Icons.science_outlined, label: 'Open Lab', hint: 'Route', action: (c) { appRouter.go('/lab'); c.read<ConsoleCubit>().dismiss(); }),
       _Command(icon: Icons.terminal_rounded, label: 'Open Terminal', hint: 'Dev tools', action: (c) => c.read<ConsoleCubit>().openTerminal()),
       _Command(icon: Icons.sports_esports_outlined, label: 'Play a game', hint: 'Dev tools', action: (c) => c.read<ConsoleCubit>().openGame()),
-      _Command(icon: Icons.auto_awesome_rounded, label: 'Toggle Vivid mode', hint: 'Theme', action: (c) => c.read<PaletteCubit>().toggle()),
+      _Command(icon: Icons.auto_awesome_rounded, label: 'Toggle Vivid mode', hint: 'Theme', action: (c) { c.read<PaletteCubit>().toggle(); c.read<ConsoleCubit>().dismiss(); }),
       for (final s in socials)
         _Command(
           icon: _socialIcon(s.label),
@@ -137,8 +172,7 @@ class _CommandPaletteState extends State<CommandPalette> {
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
-    _focusNode.dispose();
-    _kbFocusNode.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -147,18 +181,8 @@ class _CommandPaletteState extends State<CommandPalette> {
     final list = _filtered;
     final width = context.responsive<double>(mobile: double.infinity, tablet: 560, desktop: 600);
 
-    return KeyboardListener(
-      focusNode: _kbFocusNode,
-      autofocus: false,
-      onKeyEvent: (e) {
-        if (e is! KeyDownEvent && e is! KeyRepeatEvent) return;
-        if (e.logicalKey == LogicalKeyboardKey.arrowDown) _move(1);
-        if (e.logicalKey == LogicalKeyboardKey.arrowUp) _move(-1);
-        if (e.logicalKey == LogicalKeyboardKey.enter) _run(_selected, context);
-        if (e.logicalKey == LogicalKeyboardKey.escape) context.read<ConsoleCubit>().dismiss();
-      },
-      child: Center(
-        child: SizedBox(
+    return Center(
+      child: SizedBox(
           width: width == double.infinity
               ? MediaQuery.sizeOf(context).width - context.pageGutter * 2
               : width,
@@ -185,7 +209,8 @@ class _CommandPaletteState extends State<CommandPalette> {
                           Expanded(
                             child: TextField(
                               controller: _controller,
-                              focusNode: _focusNode,
+                              focusNode: _searchFocus,
+                              autofocus: true,
                               style: AppText.mono(size: 15, color: AppColors.textPrimary, spacing: 0),
                               decoration: InputDecoration(
                                 hintText: 'Type a command…',
@@ -284,7 +309,6 @@ class _CommandPaletteState extends State<CommandPalette> {
             ),
           ),
         ),
-      ),
     );
   }
 }

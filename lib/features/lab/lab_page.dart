@@ -120,13 +120,13 @@ class LabPage extends StatelessWidget {
                         const _Exhibit(
                           title: 'Monte Carlo Simulator',
                           caption:
-                              'Geometric Brownian Motion in an isolate',
+                              'Real stock data · GBM forward paths in a background isolate',
                           child: MonteCarloSim(),
                         ),
                         const SizedBox(height: Insets.xxl),
                         const _Exhibit(
                           title: 'Boids Flocking',
-                          caption: 'Emergent behavior — 3 local rules',
+                          caption: 'Boids — separation, alignment & cohesion produce emergent flocking',
                           child: BoidsField(),
                         ),
                         const SizedBox(height: Insets.xxl),

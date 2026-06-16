@@ -33,12 +33,12 @@ class _BoidsFieldState extends State<BoidsField> with SingleTickerProviderStateM
   Size _size = Size.zero;
 
   static const _count = 120;
-  static const _maxSpeed = 115.0;
-  static const _minSpeed = 38.0;
-  static const _neighborR = 80.0;
-  static const _separationR = 24.0;
-  static const _weights = (sep: 1.6, align: 1.0, coh: 0.7, cursor: 0.6);
-  static const _maxForce = 65.0;
+  static const _neighborR = 58.0;
+  static const _sepR = 26.0;
+  static const _maxSpeed = 78.0;
+  static const _minSpeed = 30.0;
+  static const _accel = 220.0;
+  static const _wSep = 1.8, _wAli = 0.9, _wCoh = 0.65, _wCursor = 0.45;
 
   static const _palette = [
     AppColors.violet,
@@ -91,9 +91,9 @@ class _BoidsFieldState extends State<BoidsField> with SingleTickerProviderStateM
     if (mounted) setState(() {});
   }
 
-  static Offset _limit(Offset v, double maxMag) {
+  static Offset _norm(Offset v) {
     final d = v.distance;
-    return d > maxMag && d > 0 ? v / d * maxMag : v;
+    return d == 0 ? Offset.zero : v / d;
   }
 
   Offset _wrap(Offset p) => Offset(
@@ -102,71 +102,40 @@ class _BoidsFieldState extends State<BoidsField> with SingleTickerProviderStateM
       );
 
   void _step(double dt, Offset? cursor) {
-    final n = _boids.length;
-    final newVels = List<Offset>.filled(n, Offset.zero);
-
-    for (var i = 0; i < n; i++) {
-      final b = _boids[i];
-      var sepForce = Offset.zero;
-      var alignSum = Offset.zero;
+    for (final b in _boids) {
+      var sep = Offset.zero;
+      var aliSum = Offset.zero;
       var cohSum = Offset.zero;
-      var neighbors = 0;
+      var nNbr = 0, nSep = 0;
 
-      for (var j = 0; j < n; j++) {
-        if (j == i) continue;
-        final other = _boids[j];
-        // Use toroidal distance
-        var dx = other.pos.dx - b.pos.dx;
-        var dy = other.pos.dy - b.pos.dy;
-        if (dx.abs() > _size.width / 2) dx -= _size.width * dx.sign;
-        if (dy.abs() > _size.height / 2) dy -= _size.height * dy.sign;
-        final dist = sqrt(dx * dx + dy * dy);
-
-        if (dist < _neighborR) {
-          neighbors++;
-          alignSum += other.vel;
-          cohSum += other.pos;
-          if (dist < _separationR && dist > 0) {
-            sepForce -= Offset(dx / (dist * dist), dy / (dist * dist));
+      for (final o in _boids) {
+        if (identical(o, b)) continue;
+        final d = b.pos - o.pos;
+        final dist = d.distance;
+        if (dist > 0 && dist < _neighborR) {
+          aliSum += o.vel;
+          cohSum += o.pos;
+          nNbr++;
+          if (dist < _sepR) {
+            sep += d / (dist * dist);
+            nSep++;
           }
         }
       }
 
       var steer = Offset.zero;
-
-      if (sepForce != Offset.zero) {
-        steer += _limit(sepForce, _maxForce) * _weights.sep;
+      if (nSep > 0) steer += _norm(sep) * _wSep;
+      if (nNbr > 0) {
+        steer += _norm(aliSum / nNbr.toDouble() - b.vel) * _wAli;
+        steer += _norm(cohSum / nNbr.toDouble() - b.pos) * _wCoh;
       }
-      if (neighbors > 0) {
-        final avgVel = alignSum / neighbors.toDouble();
-        steer += _limit(avgVel - b.vel, _maxForce) * _weights.align;
+      if (cursor != null) steer += _norm(cursor - b.pos) * _wCursor;
 
-        var cx = cohSum.dx / neighbors;
-        var cy = cohSum.dy / neighbors;
-        // Toroidal center correction
-        if ((cx - b.pos.dx).abs() > _size.width / 2) cx -= _size.width * (cx - b.pos.dx).sign;
-        if ((cy - b.pos.dy).abs() > _size.height / 2) cy -= _size.height * (cy - b.pos.dy).sign;
-        steer += _limit(Offset(cx - b.pos.dx, cy - b.pos.dy), _maxForce) * _weights.coh;
-      }
-
-      // Cursor attraction
-      if (cursor != null) {
-        final toC = cursor - b.pos;
-        if (toC.distance < 160) {
-          steer += _limit(toC, _maxForce) * _weights.cursor;
-        }
-      }
-
-      var newVel = b.vel + steer * dt;
-      final spd = newVel.distance;
-      if (spd > _maxSpeed) newVel = newVel / spd * _maxSpeed;
-      if (spd < _minSpeed && spd > 0) newVel = newVel / spd * _minSpeed;
-      newVels[i] = newVel;
-    }
-
-    for (var i = 0; i < n; i++) {
-      _boids[i].vel = newVels[i];
-      _boids[i].pos = _wrap(_boids[i].pos + _boids[i].vel * dt);
+      b.vel += steer * _accel * dt;
+      final spd = b.vel.distance;
+      if (spd > _maxSpeed) b.vel = b.vel / spd * _maxSpeed;
+      if (spd < _minSpeed && spd > 0) b.vel = b.vel / spd * _minSpeed;
+      b.pos = _wrap(b.pos + b.vel * dt);
     }
   }
 

@@ -11,11 +11,13 @@ import '../../../core/theme/app_text.dart';
 
 class _Particle {
   Offset pos;
+  Offset vel;
   double age; // 0→1 over lifetime
   final Color color;
   final double radius;
 
-  _Particle({required this.pos, required this.color, required this.radius}) : age = 0;
+  _Particle({required this.pos, required this.vel, required this.color, required this.radius})
+      : age = 0;
 
   bool get dead => age >= 1.0;
   double get alpha => (1 - age * age).clamp(0.0, 1.0);
@@ -65,6 +67,7 @@ class _DrawCanvasState extends State<DrawCanvas> with SingleTickerProviderStateM
     bool any = false;
     for (final p in _particles) {
       p.age += dt / _lifetime;
+      p.pos += p.vel * dt;
       if (!p.dead) any = true;
     }
     _particles.removeWhere((p) => p.dead);
@@ -94,10 +97,14 @@ class _DrawCanvasState extends State<DrawCanvas> with SingleTickerProviderStateM
     }
     _hueIndex++;
     final color = _palette[(_hueIndex ~/ _hueStep) % _palette.length];
+    final rng = Random();
+    final angle = rng.nextDouble() * 2 * pi;
+    final speed = 10 + rng.nextDouble() * 25;
     _particles.add(_Particle(
       pos: pos,
+      vel: Offset(cos(angle) * speed, sin(angle) * speed),
       color: color,
-      radius: 4 + Random().nextDouble() * 3,
+      radius: 4 + rng.nextDouble() * 3,
     ));
   }
 
@@ -120,34 +127,35 @@ class _DrawCanvasState extends State<DrawCanvas> with SingleTickerProviderStateM
       children: [
         SizedBox(
           height: h,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Listener(
-              onPointerDown: (e) => _emit(e.localPosition),
-              onPointerMove: (e) => _emit(e.localPosition),
-              onPointerUp: (_) => _prevPointer = null,
-              onPointerCancel: (_) => _prevPointer = null,
+          // Listener is OUTSIDE ClipRRect so the clip region never intercepts
+          // hit-tests, and all pointer events in the SizedBox area are captured.
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: (e) => _emit(e.localPosition),
+            onPointerMove: (e) => _emit(e.localPosition),
+            onPointerUp: (_) => _prevPointer = null,
+            onPointerCancel: (_) => _prevPointer = null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
               child: Container(
                 decoration: BoxDecoration(
                   color: const Color(0x33060610),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.border),
                 ),
-                child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: _CanvasPainter(particles: List.unmodifiable(_particles)),
-                    child: _particles.isEmpty
-                        ? Center(
-                            child: Text(
-                              'Draw here',
-                              style: AppText.mono(
-                                  size: 14,
-                                  color: AppColors.textTertiary.withValues(alpha: 0.4),
-                                  spacing: 2),
-                            ),
-                          )
-                        : null,
-                  ),
+                child: CustomPaint(
+                  painter: _CanvasPainter(particles: List.unmodifiable(_particles)),
+                  child: _particles.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Draw here',
+                            style: AppText.mono(
+                                size: 14,
+                                color: AppColors.textTertiary.withValues(alpha: 0.4),
+                                spacing: 2),
+                          ),
+                        )
+                      : const SizedBox.expand(),
                 ),
               ),
             ),

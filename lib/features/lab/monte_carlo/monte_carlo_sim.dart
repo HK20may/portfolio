@@ -1,20 +1,105 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:isolate';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:http/http.dart' as http;
 
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text.dart';
 import 'monte_carlo_engine.dart';
 
+// ── Data models ───────────────────────────────────────────────────────────────
+
+class PricePoint {
+  const PricePoint(this.date, this.close);
+  final DateTime date;
+  final double close;
+}
+
+class _TickerInfo {
+  const _TickerInfo({required this.code, required this.symbol, this.exchange});
+  final String code;
+  final String symbol; // '₹' or '$'
+  final String? exchange; // e.g. 'NSE'
+}
+
+const _tickers = [
+  _TickerInfo(code: 'RELIANCE', symbol: '₹', exchange: 'NSE'),
+  _TickerInfo(code: 'TCS', symbol: '₹', exchange: 'NSE'),
+  _TickerInfo(code: 'INFY', symbol: '₹', exchange: 'NSE'),
+  _TickerInfo(code: 'HDFCBANK', symbol: '₹', exchange: 'NSE'),
+  _TickerInfo(code: 'TATAMOTORS', symbol: '₹', exchange: 'NSE'),
+  _TickerInfo(code: 'AAPL', symbol: r'$'),
+  _TickerInfo(code: 'TSLA', symbol: r'$'),
+  _TickerInfo(code: 'NVDA', symbol: r'$'),
+  _TickerInfo(code: 'MSFT', symbol: r'$'),
+];
+
+// ── API fetch ─────────────────────────────────────────────────────────────────
+
+// Get a free key at https://twelvedata.com (800 req/day, CORS-enabled).
+const String _twelveDataKey = 'YOUR_FREE_API_KEY';
+
+Future<List<PricePoint>> fetchDailyCloses({
+  required String symbol,
+  String? exchange,
+  int outputsize = 400,
+}) async {
+  final qp = {
+    'symbol': symbol,
+    if (exchange != null) 'exchange': exchange,
+    'interval': '1day',
+    'outputsize': '$outputsize',
+    'order': 'ASC',
+    'apikey': _twelveDataKey,
+  };
+  final uri = Uri.https('api.twelvedata.com', '/time_series', qp);
+  final res = await http.get(uri);
+  final j = jsonDecode(res.body) as Map<String, dynamic>;
+  if (j['status'] == 'error' || j['values'] == null) {
+    throw Exception(j['message'] ?? 'price fetch failed');
+  }
+  final values = (j['values'] as List).cast<Map<String, dynamic>>();
+  return values
+      .map((v) => PricePoint(
+            DateTime.parse(v['datetime'] as String),
+            double.parse(v['close'] as String),
+          ))
+      .toList();
+}
+
+// ── Calibration ───────────────────────────────────────────────────────────────
+
+({double mu, double sigma, double s0}) calibrate(List<PricePoint> series) {
+  final closes = series.map((p) => p.close).toList();
+  final rets = <double>[];
+  for (var i = 1; i < closes.length; i++) {
+    rets.add(log(closes[i] / closes[i - 1]));
+  }
+  final mean = rets.reduce((a, b) => a + b) / rets.length;
+  final variance =
+      rets.map((r) => (r - mean) * (r - mean)).reduce((a, b) => a + b) /
+          rets.length;
+  final sd = sqrt(variance);
+  return (mu: mean * 252, sigma: sd * sqrt(252), s0: closes.last);
+}
+
+// ── Compute helper ────────────────────────────────────────────────────────────
+
 Future<MonteCarloResult> _compute(MonteCarloParams p) async {
   if (kIsWeb) return runMonteCarlo(p);
   return Isolate.run(() => runMonteCarlo(p));
 }
+
+// ── Mode ──────────────────────────────────────────────────────────────────────
+
+enum _SimMode { real, custom }
+
+// ── Widget ────────────────────────────────────────────────────────────────────
 
 class MonteCarloSim extends StatefulWidget {
   const MonteCarloSim({super.key});
@@ -25,10 +110,22 @@ class MonteCarloSim extends StatefulWidget {
 
 class _MonteCarloSimState extends State<MonteCarloSim>
     with SingleTickerProviderStateMixin {
+  // Custom-mode params (also used for horizon/sims in real mode)
   double _mu = 0.08;
   double _sigma = 0.20;
-  double _days = 252;
-  double _sims = 200;
+  double _days = 126;
+  double _sims = 300;
+
+  // Real-mode state
+  _SimMode _mode = _SimMode.real;
+  _TickerInfo _ticker = _tickers.first;
+  List<PricePoint>? _history;
+  bool _fetchLoading = false;
+  String? _fetchError;
+  double? _impliedMu, _impliedSigma, _impliedS0;
+
+  // Per-step cone paths (precomputed)
+  List<double>? _coneP5, _coneP95;
 
   MonteCarloResult? _result;
   bool _computing = false;
@@ -42,7 +139,7 @@ class _MonteCarloSimState extends State<MonteCarloSim>
   @override
   void initState() {
     super.initState();
-    _scheduleCompute();
+    _fetchAndRun();
   }
 
   @override
@@ -51,31 +148,121 @@ class _MonteCarloSimState extends State<MonteCarloSim>
     if (context.reduceMotion) _drawCtrl.value = 1;
   }
 
-  void _scheduleCompute() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), _run);
+  String _fmt(double v) {
+    // Always use the selected ticker's symbol; default ticker is RELIANCE → ₹.
+    return '${_ticker.symbol}${_fmtNum(v)}';
   }
 
-  Future<void> _run() async {
+  String _fmtNum(double v) {
+    final s = v.toStringAsFixed(2);
+    final dot = s.indexOf('.');
+    final intPart = s.substring(0, dot);
+    final decPart = s.substring(dot);
+    final buf = StringBuffer();
+    for (var i = 0; i < intPart.length; i++) {
+      if (i > 0 && (intPart.length - i) % 3 == 0) buf.write(',');
+      buf.write(intPart[i]);
+    }
+    return '${buf.toString()}$decPart';
+  }
+
+  // ── Data fetch ──────────────────────────────────────────────────────────────
+
+  Future<void> _fetchAndRun() async {
+    if (_mode == _SimMode.custom) {
+      _scheduleCompute();
+      return;
+    }
+    setState(() {
+      _fetchLoading = true;
+      _fetchError = null;
+      _history = null;
+      _result = null;
+      _coneP5 = null;
+      _coneP95 = null;
+    });
+
+    try {
+      final data = await fetchDailyCloses(
+        symbol: _ticker.code,
+        exchange: _ticker.exchange,
+      );
+      if (!mounted) return;
+      final cal = calibrate(data);
+      setState(() {
+        _history = data;
+        _impliedMu = cal.mu;
+        _impliedSigma = cal.sigma;
+        _impliedS0 = cal.s0;
+        _fetchLoading = false;
+      });
+      await _runWithParams(s0: cal.s0, mu: cal.mu, sigma: cal.sigma);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _fetchLoading = false;
+        _fetchError = 'Could not load ${_ticker.code} — using custom mode.';
+        _mode = _SimMode.custom;
+      });
+      _scheduleCompute();
+    }
+  }
+
+  // ── Compute ─────────────────────────────────────────────────────────────────
+
+  void _scheduleCompute() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      if (_mode == _SimMode.custom) {
+        _runWithParams(s0: 100, mu: _mu, sigma: _sigma);
+      } else if (_impliedS0 != null) {
+        _runWithParams(s0: _impliedS0!, mu: _impliedMu!, sigma: _impliedSigma!);
+      }
+    });
+  }
+
+  Future<void> _runWithParams({
+    required double s0,
+    required double mu,
+    required double sigma,
+  }) async {
     if (!mounted) return;
     setState(() => _computing = true);
     final p = MonteCarloParams(
-      s0: 100,
-      muAnnual: _mu,
-      sigmaAnnual: _sigma,
+      s0: s0,
+      muAnnual: mu,
+      sigmaAnnual: sigma,
       days: _days.round(),
       sims: _sims.round(),
-      pathsToReturn: 60,
+      pathsToReturn: 80,
     );
     final result = await _compute(p);
     if (!mounted) return;
+
+    // Precompute per-step P5/P95 from sample paths for the cone
+    final cone = _buildCone(result);
+
     setState(() {
       _result = result;
+      _coneP5 = cone.$1;
+      _coneP95 = cone.$2;
       _computing = false;
     });
-    if (!context.reduceMotion) {
-      _drawCtrl.forward(from: 0);
+    if (!context.reduceMotion) _drawCtrl.forward(from: 0);
+  }
+
+  (List<double>, List<double>) _buildCone(MonteCarloResult r) {
+    final paths = r.samplePaths;
+    if (paths.isEmpty) return (<double>[], <double>[]);
+    final steps = paths[0].length;
+    final p5 = List<double>.filled(steps, 0);
+    final p95 = List<double>.filled(steps, 0);
+    for (var t = 0; t < steps; t++) {
+      final vals = paths.map((path) => path[t]).toList()..sort();
+      p5[t] = vals[((0.05) * (vals.length - 1)).round()];
+      p95[t] = vals[((0.95) * (vals.length - 1)).round()];
     }
+    return (p5, p95);
   }
 
   @override
@@ -84,6 +271,8 @@ class _MonteCarloSimState extends State<MonteCarloSim>
     _drawCtrl.dispose();
     super.dispose();
   }
+
+  // ── Sliders ─────────────────────────────────────────────────────────────────
 
   Widget _slider({
     required String label,
@@ -103,8 +292,8 @@ class _MonteCarloSimState extends State<MonteCarloSim>
                 style: AppText.mono(
                     size: 12, color: AppColors.textTertiary, spacing: 0.5)),
             Text(display,
-                style: AppText.mono(
-                    size: 12, color: AppColors.mint, spacing: 0)),
+                style:
+                    AppText.mono(size: 12, color: AppColors.mint, spacing: 0)),
           ],
         ),
         SliderTheme(
@@ -130,34 +319,129 @@ class _MonteCarloSimState extends State<MonteCarloSim>
     );
   }
 
+  Widget _readonlyStat(String label, String value) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: AppText.mono(
+                  size: 11, color: AppColors.textTertiary, spacing: 0.5)),
+          const SizedBox(height: 2),
+          Text(value,
+              style: AppText.mono(
+                  size: 13, color: AppColors.cyan, spacing: 0)),
+        ],
+      );
+
+  // ── Build ────────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = context.isDesktop;
     final r = _result;
 
-    final caption = kIsWeb
-        ? 'Geometric Brownian Motion · ${_sims.round()} simulations computed off the render path'
-        : 'Geometric Brownian Motion · ${_sims.round()} simulations computed in a background isolate — the UI never drops a frame.';
+    // Display last 200 history points so the chart isn't too cramped
+    final displayHistory = _history != null
+        ? _history!
+            .sublist(max(0, _history!.length - 200))
+            .map((p) => p.close)
+            .toList()
+        : <double>[];
 
+    // ── Mode toggle ─────────────────────────────────────────────────────────
+    final modeToggle = Row(
+      children: [
+        _ModeChip(
+          label: 'Real stock',
+          active: _mode == _SimMode.real,
+          onTap: () {
+            if (_mode == _SimMode.real) return;
+            setState(() {
+              _mode = _SimMode.real;
+              _fetchError = null;
+            });
+            _fetchAndRun();
+          },
+        ),
+        const SizedBox(width: 8),
+        _ModeChip(
+          label: 'Custom',
+          active: _mode == _SimMode.custom,
+          onTap: () {
+            if (_mode == _SimMode.custom) return;
+            setState(() {
+              _mode = _SimMode.custom;
+              _history = null;
+              _result = null;
+            });
+            _scheduleCompute();
+          },
+        ),
+      ],
+    );
+
+    // ── Controls ─────────────────────────────────────────────────────────────
     final controls = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _slider(
-          label: 'Drift μ (annual)',
-          value: _mu,
-          min: -0.20,
-          max: 0.40,
-          display: '${(_mu * 100).toStringAsFixed(0)}%',
-          onChanged: (v) => _mu = v,
-        ),
-        _slider(
-          label: 'Volatility σ (annual)',
-          value: _sigma,
-          min: 0.05,
-          max: 0.80,
-          display: '${(_sigma * 100).toStringAsFixed(0)}%',
-          onChanged: (v) => _sigma = v,
-        ),
+        // Ticker dropdown (real mode only)
+        if (_mode == _SimMode.real) ...[
+          Text('Ticker',
+              style: AppText.mono(
+                  size: 11, color: AppColors.textTertiary, spacing: 0.5)),
+          const SizedBox(height: 4),
+          _TickerDropdown(
+            tickers: _tickers,
+            selected: _ticker,
+            onChanged: (t) {
+              setState(() {
+                _ticker = t;
+                _history = null;
+                _result = null;
+              });
+              _fetchAndRun();
+            },
+          ),
+          const SizedBox(height: Insets.md),
+          // Implied stats
+          if (_impliedMu != null && _impliedSigma != null) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _readonlyStat(
+                    'Implied drift (μ)',
+                    '${(_impliedMu! * 100).toStringAsFixed(1)}% p.a.',
+                  ),
+                ),
+                Expanded(
+                  child: _readonlyStat(
+                    'Implied vol (σ)',
+                    '${(_impliedSigma! * 100).toStringAsFixed(1)}% p.a.',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Insets.md),
+          ],
+        ],
+        // Custom mode μ/σ sliders
+        if (_mode == _SimMode.custom) ...[
+          _slider(
+            label: 'Drift μ (annual)',
+            value: _mu,
+            min: -0.20,
+            max: 0.40,
+            display: '${(_mu * 100).toStringAsFixed(0)}%',
+            onChanged: (v) => _mu = v,
+          ),
+          _slider(
+            label: 'Volatility σ (annual)',
+            value: _sigma,
+            min: 0.05,
+            max: 0.80,
+            display: '${(_sigma * 100).toStringAsFixed(0)}%',
+            onChanged: (v) => _sigma = v,
+          ),
+        ],
         _slider(
           label: 'Horizon (days)',
           value: _days,
@@ -177,47 +461,81 @@ class _MonteCarloSimState extends State<MonteCarloSim>
       ],
     );
 
+    // ── Chart ────────────────────────────────────────────────────────────────
     final chart = AnimatedBuilder(
       animation: _drawCtrl,
       builder: (context, _) {
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               height: 220,
-              child: r == null
+              child: _fetchLoading
                   ? const Center(
                       child: CircularProgressIndicator(
                           color: AppColors.mint, strokeWidth: 1.5))
-                  : CustomPaint(
-                      painter: _PathPainter(
-                        result: r,
-                        progress: _drawCtrl.value,
-                        accent: AppColors.mint,
-                        s0: 100,
-                      ),
-                      size: const Size(double.infinity, 220),
-                    ),
+                  : r == null && !_fetchLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.mint, strokeWidth: 1.5))
+                      : r != null
+                          ? RepaintBoundary(
+                              child: CustomPaint(
+                                painter: _CombinedPainter(
+                                  history: displayHistory,
+                                  result: r,
+                                  progress: _drawCtrl.value,
+                                  accent: AppColors.mint,
+                                  coneP5: _coneP5 ?? [],
+                                  coneP95: _coneP95 ?? [],
+                                ),
+                                size: const Size(double.infinity, 220),
+                              ),
+                            )
+                          : const SizedBox(),
             ),
             if (r != null) ...[
               const SizedBox(height: Insets.md),
               SizedBox(
-                height: 80,
-                child: CustomPaint(
-                  painter: _HistPainter(result: r, accent: AppColors.mint),
-                  size: const Size(double.infinity, 80),
+                height: 70,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _HistPainter(result: r, accent: AppColors.mint),
+                    size: const Size(double.infinity, 70),
+                  ),
                 ),
               ),
               const SizedBox(height: Insets.md),
-              _StatsStrip(result: r),
+              _StatsStrip(result: r, fmt: _fmt),
             ],
           ],
         );
       },
     );
 
+    // ── Caption ──────────────────────────────────────────────────────────────
+    final caption = _mode == _SimMode.real && _history != null
+        ? 'Calibrated on ${_history!.length} days of real ${_ticker.code} prices'
+            ' · forward paths computed in a background isolate'
+        : kIsWeb
+            ? 'Geometric Brownian Motion · ${_sims.round()} simulations'
+            : 'Geometric Brownian Motion · ${_sims.round()} simulations'
+                ' computed in a background isolate — the UI never drops a frame.';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        modeToggle,
+        const SizedBox(height: Insets.md),
+        if (_fetchError != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: Insets.sm),
+            child: Text(
+              _fetchError!,
+              style: AppText.mono(
+                  size: 11, color: AppColors.amber.withValues(alpha: 0.9), spacing: 0),
+            ),
+          ),
         if (_computing)
           const Padding(
             padding: EdgeInsets.only(bottom: Insets.sm),
@@ -231,7 +549,7 @@ class _MonteCarloSimState extends State<MonteCarloSim>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 220, child: controls),
+              SizedBox(width: 240, child: controls),
               const SizedBox(width: Insets.xl),
               Expanded(child: chart),
             ],
@@ -250,72 +568,231 @@ class _MonteCarloSimState extends State<MonteCarloSim>
   }
 }
 
-// ── Painters ────────────────────────────────────────────────────────────────
+// ── Mode chip ─────────────────────────────────────────────────────────────────
 
-class _PathPainter extends CustomPainter {
-  _PathPainter({
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.mint.withValues(alpha: 0.18)
+              : AppColors.glassHigh,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: active ? AppColors.mint.withValues(alpha: 0.5) : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppText.mono(
+            size: 12,
+            color: active ? AppColors.mint : AppColors.textSecondary,
+            spacing: 0,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Ticker dropdown ───────────────────────────────────────────────────────────
+
+class _TickerDropdown extends StatelessWidget {
+  const _TickerDropdown({
+    required this.tickers,
+    required this.selected,
+    required this.onChanged,
+  });
+  final List<_TickerInfo> tickers;
+  final _TickerInfo selected;
+  final ValueChanged<_TickerInfo> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.glassHigh,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButton<_TickerInfo>(
+        value: selected,
+        isExpanded: true,
+        underline: const SizedBox(),
+        dropdownColor: const Color(0xFF0E0E18),
+        icon: const Icon(Icons.expand_more_rounded,
+            size: 18, color: AppColors.textTertiary),
+        style: AppText.mono(size: 13, color: AppColors.textPrimary, spacing: 0),
+        items: tickers
+            .map((t) => DropdownMenuItem<_TickerInfo>(
+                  value: t,
+                  child: Text(
+                    '${t.symbol} ${t.code}',
+                    style: AppText.mono(
+                        size: 13, color: AppColors.textPrimary, spacing: 0),
+                  ),
+                ))
+            .toList(),
+        onChanged: (t) {
+          if (t != null) onChanged(t);
+        },
+      ),
+    );
+  }
+}
+
+// ── Combined painter (history + forward) ─────────────────────────────────────
+
+class _CombinedPainter extends CustomPainter {
+  _CombinedPainter({
+    required this.history,
     required this.result,
     required this.progress,
     required this.accent,
-    required this.s0,
+    required this.coneP5,
+    required this.coneP95,
   });
+  final List<double> history;
   final MonteCarloResult result;
   final double progress;
   final Color accent;
-  final double s0;
+  final List<double> coneP5;
+  final List<double> coneP95;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (result.samplePaths.isEmpty) return;
+    final histN = history.length;
+    final fwdN = result.meanPath.length;
+    if (histN == 0 && fwdN == 0) return;
 
-    final allVals = result.samplePaths.expand((p) => p).toList()
-      ..addAll(result.meanPath);
-    final minV = allVals.reduce(min) * 0.92;
-    final maxV = allVals.reduce(max) * 1.08;
-    final steps = result.meanPath.length;
+    final totalN = histN + fwdN - 1;
+    if (totalN <= 1) return;
 
-    double px(int t) => t / (steps - 1) * size.width;
-    double py(double v) => size.height - (v - minV) / (maxV - minV) * size.height;
+    // Overall value range
+    var minV = history.isNotEmpty
+        ? history.reduce(min)
+        : result.meanPath.reduce(min);
+    var maxV = history.isNotEmpty
+        ? history.reduce(max)
+        : result.meanPath.reduce(max);
+    for (final path in result.samplePaths) {
+      for (final v in path) {
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+    }
+    minV *= 0.93;
+    maxV *= 1.07;
+    final range = maxV - minV;
+    if (range == 0) return;
 
-    final cutoff = (progress * (steps - 1)).round();
+    double px(int t) => t / (totalN - 1) * size.width;
+    double py(double v) => size.height - (v - minV) / range * size.height;
 
-    // Sample paths
-    final faintPaint = Paint()
-      ..color = accent.withValues(alpha: 0.12)
+    final cutoffX = histN > 0 ? px(histN - 1) : 0.0;
+    final cutoff = ((progress) * (fwdN - 1)).round().clamp(0, fwdN - 1);
+
+    // P5–P95 cone
+    if (coneP5.isNotEmpty && coneP95.isNotEmpty) {
+      final conePath = Path();
+      bool started = false;
+      for (var t = 0; t <= cutoff && t < coneP95.length; t++) {
+        final x = px(histN - 1 + t);
+        final y = py(coneP95[t]);
+        if (!started) {
+          conePath.moveTo(x, y);
+          started = true;
+        } else {
+          conePath.lineTo(x, y);
+        }
+      }
+      for (var t = min(cutoff, coneP5.length - 1); t >= 0; t--) {
+        conePath.lineTo(px(histN - 1 + t), py(coneP5[t]));
+      }
+      if (started) {
+        conePath.close();
+        canvas.drawPath(
+          conePath,
+          Paint()..color = accent.withValues(alpha: 0.13),
+        );
+      }
+    }
+
+    // Sample paths (faint forward)
+    final samplePaint = Paint()
+      ..color = accent.withValues(alpha: 0.09)
       ..strokeWidth = 0.8
       ..style = PaintingStyle.stroke;
     for (final path in result.samplePaths) {
-      final p = Path()..moveTo(px(0), py(path[0]));
+      final p = Path()..moveTo(cutoffX, py(path[0]));
       for (var t = 1; t <= cutoff && t < path.length; t++) {
-        p.lineTo(px(t), py(path[t]));
+        p.lineTo(px(histN - 1 + t), py(path[t]));
       }
-      canvas.drawPath(p, faintPaint);
+      canvas.drawPath(p, samplePaint);
     }
 
-    // P5/P95 band (static, from meanPath proxy)
-    // Mean path
-    final meanPaint = Paint()
-      ..color = accent.withValues(alpha: 0.9)
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke;
-    final mean = Path()..moveTo(px(0), py(result.meanPath[0]));
-    for (var t = 1; t <= cutoff && t < result.meanPath.length; t++) {
-      mean.lineTo(px(t), py(result.meanPath[t]));
+    // Mean forward path
+    if (fwdN > 0) {
+      final meanPaint = Paint()
+        ..color = accent
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke;
+      final mean = Path()..moveTo(cutoffX, py(result.meanPath[0]));
+      for (var t = 1; t <= cutoff && t < result.meanPath.length; t++) {
+        mean.lineTo(px(histN - 1 + t), py(result.meanPath[t]));
+      }
+      canvas.drawPath(mean, meanPaint);
     }
-    canvas.drawPath(mean, meanPaint);
 
-    // S0 baseline
-    final base = Paint()
-      ..color = AppColors.textTertiary.withValues(alpha: 0.4)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(0, py(s0)), Offset(size.width, py(s0)), base);
+    // History line
+    if (histN > 0) {
+      final histPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.50)
+        ..strokeWidth = 1.4
+        ..style = PaintingStyle.stroke;
+      final hist = Path()..moveTo(px(0), py(history[0]));
+      for (var i = 1; i < histN; i++) {
+        hist.lineTo(px(i), py(history[i]));
+      }
+      canvas.drawPath(hist, histPaint);
+    }
+
+    // Cutoff divider
+    if (histN > 0) {
+      canvas.drawLine(
+        Offset(cutoffX, 0),
+        Offset(cutoffX, size.height),
+        Paint()
+          ..color = AppColors.textTertiary.withValues(alpha: 0.25)
+          ..strokeWidth = 1
+          ..style = PaintingStyle.stroke,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(_PathPainter old) =>
-      old.progress != progress || old.result != result;
+  bool shouldRepaint(_CombinedPainter old) =>
+      old.progress != progress ||
+      old.result != result ||
+      old.history != history;
 }
+
+// ── Histogram painter ─────────────────────────────────────────────────────────
 
 class _HistPainter extends CustomPainter {
   _HistPainter({required this.result, required this.accent});
@@ -342,7 +819,7 @@ class _HistPainter extends CustomPainter {
       final r = Rect.fromLTWH(i * bw + 1, size.height - h, bw - 2, h);
       canvas.drawRRect(
         RRect.fromRectAndRadius(r, const Radius.circular(2)),
-        Paint()..color = accent.withValues(alpha: 0.5 + 0.4 * (counts[i] / maxC)),
+        Paint()..color = accent.withValues(alpha: 0.45 + 0.4 * (counts[i] / maxC)),
       );
     }
   }
@@ -351,32 +828,35 @@ class _HistPainter extends CustomPainter {
   bool shouldRepaint(_HistPainter old) => old.result != result;
 }
 
+// ── Stats strip ───────────────────────────────────────────────────────────────
+
 class _StatsStrip extends StatelessWidget {
-  const _StatsStrip({required this.result});
+  const _StatsStrip({required this.result, required this.fmt});
   final MonteCarloResult result;
+  final String Function(double) fmt;
 
   @override
   Widget build(BuildContext context) {
     Widget stat(String label, String value) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(value,
-            style: AppText.display(
-                size: 18, weight: FontWeight.w700, color: AppColors.mint)),
-        Text(label,
-            style: AppText.mono(
-                size: 10, color: AppColors.textTertiary, spacing: 0.5)),
-      ],
-    );
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value,
+                style: AppText.display(
+                    size: 16, weight: FontWeight.w700, color: AppColors.mint)),
+            Text(label,
+                style: AppText.mono(
+                    size: 10, color: AppColors.textTertiary, spacing: 0.5)),
+          ],
+        );
 
     return Wrap(
       spacing: Insets.xl,
       runSpacing: Insets.md,
       children: [
-        stat('Mean', '\$${result.mean.toStringAsFixed(1)}'),
-        stat('Median', '\$${result.median.toStringAsFixed(1)}'),
-        stat('P5', '\$${result.p5.toStringAsFixed(1)}'),
-        stat('P95', '\$${result.p95.toStringAsFixed(1)}'),
+        stat('Mean', fmt(result.mean)),
+        stat('Median', fmt(result.median)),
+        stat('P5', fmt(result.p5)),
+        stat('P95', fmt(result.p95)),
         stat('Prob. Profit', '${(result.probProfit * 100).toStringAsFixed(1)}%'),
       ],
     );

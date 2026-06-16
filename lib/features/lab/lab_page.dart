@@ -202,26 +202,52 @@ class _Exhibit extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = context.isMobile;
+    final pad = context.responsive<double>(
+      mobile: Insets.md,
+      tablet: Insets.lg,
+      desktop: Insets.xl,
+    );
+
     return RevealOnScroll(
       child: GlassContainer(
-        padding: const EdgeInsets.all(Insets.xl),
+        padding: EdgeInsets.all(pad),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(title,
-                      style: AppText.display(
-                          size: 22, weight: FontWeight.w700)),
-                ),
-                Text(caption,
-                    style: AppText.mono(
-                        size: 11,
-                        color: AppColors.textTertiary,
-                        spacing: 0.4)),
-              ],
-            ),
+            if (isMobile) ...[
+              Text(title,
+                  style: AppText.display(size: 20, weight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Text(
+                caption,
+                style: AppText.mono(
+                    size: 10, color: AppColors.textTertiary, spacing: 0.3),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ] else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(title,
+                        style: AppText.display(
+                            size: 22, weight: FontWeight.w700)),
+                  ),
+                  const SizedBox(width: Insets.md),
+                  Flexible(
+                    child: Text(
+                      caption,
+                      style: AppText.mono(
+                          size: 11,
+                          color: AppColors.textTertiary,
+                          spacing: 0.4),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             const SizedBox(height: Insets.lg),
             child,
           ],

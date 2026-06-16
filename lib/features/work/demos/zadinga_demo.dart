@@ -377,16 +377,22 @@ class _ProductGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (final p in products)
-          SizedBox(
-            width: (MediaQuery.sizeOf(context).width - 74) / 2,
-            child: _ProductCard(product: p, onAdd: () => onAddToCart(p)),
-          ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 10.0;
+        final cardWidth = (constraints.maxWidth - spacing) / 2;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final p in products)
+              SizedBox(
+                width: cardWidth,
+                child: _ProductCard(product: p, onAdd: () => onAddToCart(p)),
+              ),
+          ],
+        );
+      },
     );
   }
 }

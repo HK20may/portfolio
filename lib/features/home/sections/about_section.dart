@@ -100,8 +100,9 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const profile = PortfolioData.profile;
+    final pad = context.responsive<double>(mobile: Insets.md, desktop: Insets.xl);
     return GlassContainer(
-      padding: const EdgeInsets.all(Insets.xl),
+      padding: EdgeInsets.all(pad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,

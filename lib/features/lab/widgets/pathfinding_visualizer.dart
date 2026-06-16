@@ -126,8 +126,8 @@ class PathfindingVisualizer extends StatefulWidget {
 
 class _PathfindingVisualizerState extends State<PathfindingVisualizer>
     with SingleTickerProviderStateMixin {
-  int get _rows => widget.compact ? 10 : 14;
-  int get _cols => widget.compact ? 16 : 22;
+  int _rows = 14;
+  int _cols = 22;
 
   _Pt get _start => const _Pt(0, 0);
   _Pt get _goal => _Pt(_rows - 1, _cols - 1);
@@ -156,12 +156,26 @@ class _PathfindingVisualizerState extends State<PathfindingVisualizer>
   @override
   void initState() {
     super.initState();
+    if (widget.compact) {
+      _rows = 10;
+      _cols = 16;
+    }
     _ticker = createTicker(_onTick);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!widget.compact) {
+      final newRows = context.isMobile ? 10 : 14;
+      final newCols = context.isMobile ? 14 : 22;
+      if (newRows != _rows || newCols != _cols) {
+        _rows = newRows;
+        _cols = newCols;
+        _walls.clear();
+        _resetSearch();
+      }
+    }
     if (_tickerStarted) return;
     _tickerStarted = true;
     if (!context.reduceMotion) _ticker.start();
@@ -255,7 +269,9 @@ class _PathfindingVisualizerState extends State<PathfindingVisualizer>
 
   @override
   Widget build(BuildContext context) {
-    final pad = widget.compact ? Insets.md : Insets.lg;
+    final pad = widget.compact
+        ? Insets.sm
+        : context.responsive<double>(mobile: Insets.sm, desktop: Insets.md);
     return Padding(
       padding: EdgeInsets.all(pad),
       child: Column(
@@ -344,7 +360,9 @@ class _PathfindingVisualizerState extends State<PathfindingVisualizer>
     return LayoutBuilder(
       builder: (context, constraints) {
         final cellW = constraints.maxWidth / _cols;
-        final cellH = widget.compact ? 28.0 : 34.0;
+        final cellH = widget.compact
+            ? 22.0
+            : context.responsive<double>(mobile: 26.0, desktop: 34.0);
         final totalH = cellH * _rows;
         final cellSz = Size(cellW, cellH);
 

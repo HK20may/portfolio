@@ -131,7 +131,9 @@ class _ProjectCardState extends State<ProjectCard>
               children: [
                 ProjectVisual(project: widget.project, height: 168),
                 Padding(
-                  padding: const EdgeInsets.all(Insets.xl),
+                  padding: EdgeInsets.all(
+                    context.responsive<double>(mobile: Insets.md, desktop: Insets.xl),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -145,8 +147,10 @@ class _ProjectCardState extends State<ProjectCard>
                       const SizedBox(height: 10),
                       Text(
                         widget.project.title,
-                        style:
-                            AppText.display(size: 26, weight: FontWeight.w700),
+                        style: AppText.display(
+                          size: context.responsive<double>(mobile: 22, desktop: 26),
+                          weight: FontWeight.w700,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Text(

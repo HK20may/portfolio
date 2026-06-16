@@ -426,7 +426,9 @@ class _SortingVisualizerState extends State<SortingVisualizer>
   Widget build(BuildContext context) {
     final chartHeight = widget.compact ? 130.0 : 180.0;
     final done = _stepIdx >= _steps.length && _steps.isNotEmpty;
-    final pad = widget.compact ? Insets.md : Insets.lg;
+    final pad = widget.compact
+        ? Insets.sm
+        : context.responsive<double>(mobile: Insets.sm, desktop: Insets.md);
 
     final column = Padding(
       padding: EdgeInsets.all(pad),
@@ -448,6 +450,8 @@ class _SortingVisualizerState extends State<SortingVisualizer>
           Text(
             _status,
             style: AppText.mono(size: 12, color: AppColors.textSecondary, spacing: 0),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: Insets.sm),
           // ── Bar chart ─────────────────────────────────────────────────
@@ -470,17 +474,22 @@ class _SortingVisualizerState extends State<SortingVisualizer>
           ),
           const SizedBox(height: Insets.sm),
           // ── Legend + counters ─────────────────────────────────────────
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _swatch('Comparing', AppColors.amber),
-              const SizedBox(width: 12),
               _swatch('Swapping', AppColors.pink),
-              const SizedBox(width: 12),
               _swatch('Sorted', AppColors.mint),
-              const Spacer(),
-              _counter('${_comparisons}c', AppColors.amber),
-              const SizedBox(width: 10),
-              _counter('${_swaps}s', AppColors.pink),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _counter('${_comparisons}c', AppColors.amber),
+                  const SizedBox(width: 10),
+                  _counter('${_swaps}s', AppColors.pink),
+                ],
+              ),
             ],
           ),
 

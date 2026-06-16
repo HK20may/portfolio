@@ -556,8 +556,9 @@ class _MonteCarloSimState extends State<MonteCarloSim>
             : 'Geometric Brownian Motion · ${_sims.round()} simulations'
                 ' computed in a background isolate — the UI never drops a frame.';
 
-    return Column(
+    final column = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         modeToggle,
         const SizedBox(height: Insets.md),
@@ -601,6 +602,15 @@ class _MonteCarloSimState extends State<MonteCarloSim>
                 size: 11, color: AppColors.textTertiary, spacing: 0.3)),
       ],
     );
+
+    // compact = true means the widget is inside the project-detail demo box,
+    // which has a fixed maxHeight. Wrap in SingleChildScrollView so the full
+    // controls + chart are reachable without overflowing.
+    // compact = false (lab page) = no height cap, plain column is fine.
+    if (widget.compact) {
+      return SingleChildScrollView(child: column);
+    }
+    return column;
   }
 }
 

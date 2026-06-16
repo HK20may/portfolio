@@ -37,7 +37,7 @@ class HeroSection extends StatelessWidget {
     final nameSize = context.responsive<double>(
       mobile: 46,
       tablet: 76,
-      desktop: 104,
+      desktop: 96,
     );
 
     final cursor = CursorScope.maybeOf(context);
@@ -123,27 +123,41 @@ class _HeroText extends StatelessWidget {
           ],
         ),
         const SizedBox(height: Insets.xl),
-        // Kinetic name
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1100),
-          child: KineticText(
-            profile.name,
-            play: play,
-            startDelay: const Duration(milliseconds: 120),
-            style: AppText.display(
-              size: nameSize,
-              weight: FontWeight.w800,
-              height: 0.98,
-              spacing: -2,
-              shadows: const [
-                Shadow(
-                  color: Color(0xB3000000),
-                  blurRadius: 24,
-                  offset: Offset(0, 6),
+        // Kinetic name — LayoutBuilder caps the font size so no word-Row
+        // in KineticText ever overflows its Wrap constraint, regardless of
+        // the available column width (changes on route transitions as the
+        // scrollbar appears/disappears).
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Longest word in the name is 7 chars ("Harshit" / "Kumawat").
+            // At Syne Bold w800 the advance per char is empirically ~nameSize * 1.15.
+            // Keep 8% safety margin so we stay comfortably under the limit.
+            const longestWord = 7;
+            const charRatio = 1.15;
+            final maxSafe = (constraints.maxWidth * 0.92) / (longestWord * charRatio);
+            final safeSize = nameSize.clamp(0.0, maxSafe);
+            return ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: KineticText(
+                profile.name,
+                play: play,
+                startDelay: const Duration(milliseconds: 120),
+                style: AppText.display(
+                  size: safeSize,
+                  weight: FontWeight.w800,
+                  height: 0.98,
+                  spacing: -2,
+                  shadows: const [
+                    Shadow(
+                      color: Color(0xB3000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
         const SizedBox(height: Insets.lg),
         _RoleCycler(roles: profile.roles, play: play),

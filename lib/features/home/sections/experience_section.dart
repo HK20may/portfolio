@@ -228,8 +228,9 @@ class _ExperienceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pad = context.responsive<double>(mobile: Insets.md, desktop: Insets.xl);
     return GlassContainer(
-      padding: const EdgeInsets.all(Insets.xl),
+      padding: EdgeInsets.all(pad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

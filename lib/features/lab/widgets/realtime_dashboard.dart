@@ -203,16 +203,20 @@ class _RealtimeDashboardState extends State<RealtimeDashboard> {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                _isLive
-                    ? '● Live · CoinGecko  · updated ${_updatedLabel()}'
-                    : '◎ Simulated stream (CoinGecko offline)',
-                style: AppText.mono(
-                    size: 11,
-                    color: _isLive ? AppColors.mint : AppColors.amber,
-                    spacing: 0),
+              Flexible(
+                child: Text(
+                  _isLive
+                      ? '● Live · CoinGecko · updated ${_updatedLabel()}'
+                      : '◎ Simulated (CoinGecko offline)',
+                  style: AppText.mono(
+                      size: 11,
+                      color: _isLive ? AppColors.mint : AppColors.amber,
+                      spacing: 0),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => setState(() => _paused = !_paused),
                 child: Container(

@@ -36,9 +36,25 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+# Run `dart run flutter_launcher_icons` after placing assets/images/avatar.png
+# (declare the asset under flutter: assets: first).
+flutter_launcher_icons:
+  image_path: "assets/images/avatar.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    background_color: "#07070E"
+    theme_color: "#7C5CFF"
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/mascot.png
 
   # GLSL fragment shader powering the ambient aurora background.
   shaders:

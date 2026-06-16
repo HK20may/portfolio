@@ -42,7 +42,7 @@ class _KineticTextState extends State<KineticText>
       vsync: this,
       duration: Duration(milliseconds: total),
     );
-    _maybePlay();
+    // _maybePlay() deferred to didChangeDependencies — MediaQuery unavailable in initState.
   }
 
   void _maybePlay() {

@@ -7,15 +7,16 @@ abstract final class PortfolioData {
   static const Profile profile = Profile(
     name: 'Harshit Kumawat',
     roles: [
-      'Flutter Developer',
+      'Software Developer 3',
       'Cross-Platform Engineer',
+      'Flutter Developer',
       'Motion & UI Craftsman',
+      'Techie Enthusiast',
     ],
-    tagline:
-        'I build cross-platform products people actually feel — '
+    tagline: 'I build cross-platform products people actually feel — '
         'now going full-stack.',
     about: [
-      'I\'m a Flutter developer with 4+ years turning ambitious product ideas '
+      'I\'m a Software Developer 3 with 4+ years turning ambitious product ideas '
           'into fast, fluid apps across Android, iOS, web and desktop. I care '
           'about the details most people only feel: spring physics, motion '
           'that guides the eye, and interfaces that respond the instant you '
@@ -142,8 +143,7 @@ abstract final class PortfolioData {
       role: 'Flutter Developer · Mobile App Lead',
       location: 'Hyderabad, India',
       period: 'Dec 2022 — Mar 2024',
-      blurb:
-          'Led mobile for Zadinga, a SaaS commerce app (50k+ downloads) '
+      blurb: 'Led mobile for Zadinga, a SaaS commerce app (50k+ downloads) '
           'spanning Android, iOS, web and desktop from a single Flutter '
           'codebase.',
       highlights: [
@@ -164,8 +164,7 @@ abstract final class PortfolioData {
       role: 'Software Developer',
       location: 'Mumbai, India',
       period: 'Jul 2021 — Nov 2022',
-      blurb:
-          'Quick-commerce at national scale. Built and shipped features for '
+      blurb: 'Quick-commerce at national scale. Built and shipped features for '
           'the Fraazo app (1M+ downloads) in a fast-moving FMCG startup.',
       highlights: [
         'Designed responsive, adaptive UIs for a consistent experience across '
@@ -312,8 +311,7 @@ abstract final class PortfolioData {
       title: 'Sorting Visualizer',
       subtitle: 'Watch algorithms race through data',
       context: 'Personal · Flutter',
-      description:
-          'An interactive educational tool for understanding sorting '
+      description: 'An interactive educational tool for understanding sorting '
           'algorithms. Five classic algorithms — Bubble, Selection, '
           'Insertion, Quick, and Merge — are implemented as step generators '
           'that pre-record every comparison, swap, and overwrite. A Ticker '

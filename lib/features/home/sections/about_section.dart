@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/data/portfolio_data.dart';
@@ -101,26 +103,20 @@ class _ProfileCard extends StatelessWidget {
     return GlassContainer(
       padding: const EdgeInsets.all(Insets.xl),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Monogram avatar. Swap this Container for a CircleAvatar /
-          // Image.asset once you add a photo (see README).
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              gradient: AppColors.auroraGradient,
-              borderRadius: BorderRadius.circular(Corners.lg),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              'HK',
-              style: AppText.display(
-                size: 40,
-                weight: FontWeight.w800,
-                color: Colors.white,
-              ),
+          // Drop a square PNG at assets/images/avatar.png and declare it under
+          // flutter: assets: in pubspec.yaml to display the real photo here
+          // and use it as the app icon (run: dart run flutter_launcher_icons).
+          ClipRRect(
+            borderRadius: BorderRadius.circular(Corners.pill),
+            child: Image.asset(
+              'images/avatar.png',
+              width: 112,
+              height: 112,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const _DrawnAvatar(),
             ),
           ),
           const SizedBox(height: Insets.lg),
@@ -154,6 +150,7 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(icon, size: 17, color: AppColors.cyan),
         const SizedBox(width: 10),
@@ -166,4 +163,111 @@ class _InfoRow extends StatelessWidget {
       ],
     );
   }
+}
+
+// ── Drawn avatar fallback ─────────────────────────────────────────────────────
+
+/// Shown when assets/images/avatar.png is not yet present.
+/// A friendly stylised cartoon face drawn in Flutter.
+class _DrawnAvatar extends StatelessWidget {
+  const _DrawnAvatar();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 112,
+      height: 112,
+      child: RepaintBoundary(
+        child: CustomPaint(painter: _AvatarPainter()),
+      ),
+    );
+  }
+}
+
+class _AvatarPainter extends CustomPainter {
+  const _AvatarPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2;
+    final center = Offset(r, r);
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+
+    // Aurora gradient background
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(r * 0.44)),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF7C5CFF), Color(0xFFFF5C8A), Color(0xFF2DD4FF)],
+          stops: [0.0, 0.5, 1.0],
+        ).createShader(rect),
+    );
+
+    // Face
+    canvas.drawCircle(
+      center + Offset(0, r * 0.10),
+      r * 0.58,
+      Paint()..color = const Color(0xFFEEB896),
+    );
+
+    // Hair cap (semicircle, slightly larger than face)
+    canvas.drawArc(
+      Rect.fromCenter(
+          center: center + Offset(0, r * 0.06),
+          width: r * 1.24,
+          height: r * 1.24),
+      pi,
+      pi,
+      true,
+      Paint()..color = const Color(0xFF2A1A0A),
+    );
+    // Side sideburns
+    canvas.drawOval(
+      Rect.fromCenter(
+          center: center + Offset(-r * 0.55, r * 0.14),
+          width: r * 0.20,
+          height: r * 0.32),
+      Paint()..color = const Color(0xFF2A1A0A),
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+          center: center + Offset(r * 0.55, r * 0.14),
+          width: r * 0.20,
+          height: r * 0.32),
+      Paint()..color = const Color(0xFF2A1A0A),
+    );
+
+    // Eyes
+    final eyeY = center.dy + r * 0.04;
+    canvas.drawCircle(Offset(center.dx - r * 0.20, eyeY), r * 0.07,
+        Paint()..color = const Color(0xFF2A1A0A));
+    canvas.drawCircle(Offset(center.dx + r * 0.20, eyeY), r * 0.07,
+        Paint()..color = const Color(0xFF2A1A0A));
+    // Highlights
+    canvas.drawCircle(Offset(center.dx - r * 0.17, eyeY - r * 0.03), r * 0.024,
+        Paint()..color = Colors.white.withOpacity(0.80));
+    canvas.drawCircle(Offset(center.dx + r * 0.23, eyeY - r * 0.03), r * 0.024,
+        Paint()..color = Colors.white.withOpacity(0.80));
+
+    // Smile
+    canvas.drawArc(
+      Rect.fromCenter(
+          center: center + Offset(0, r * 0.24),
+          width: r * 0.46,
+          height: r * 0.28),
+      0.3,
+      pi - 0.6,
+      false,
+      Paint()
+        ..color = const Color(0xFF2A1A0A)
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_AvatarPainter _) => false;
 }

@@ -8,7 +8,6 @@ import '../../state/scroll_intent_cubit.dart';
 import '../../shared/widgets/aurora_background.dart';
 import '../../shared/widgets/grain_overlay.dart';
 import '../../shared/widgets/nav_bar.dart';
-import '../boot/boot_overlay.dart';
 import 'sections/about_section.dart';
 import 'sections/contact_section.dart';
 import 'sections/experience_section.dart';
@@ -30,8 +29,6 @@ class _HomePageState extends State<HomePage> {
     for (final s in Section.values) s: GlobalKey(),
   };
   final Map<Section, double> _fractions = {};
-
-  bool _booted = false;
 
   @override
   void initState() {
@@ -135,7 +132,7 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     _block(
                       Section.hero,
-                      HeroSection(play: _booted, onNavigate: _scrollTo),
+                      HeroSection(play: true, onNavigate: _scrollTo),
                     ),
                     _block(Section.about, const AboutSection()),
                     _block(Section.skills, const SkillsSection()),
@@ -185,15 +182,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // First-load curtain.
-            if (!_booted)
-              Positioned.fill(
-                child: BootOverlay(
-                  onComplete: () {
-                    if (mounted) setState(() => _booted = true);
-                  },
-                ),
-              ),
           ],
         ),
       ),

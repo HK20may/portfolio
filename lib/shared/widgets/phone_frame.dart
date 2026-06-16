@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text.dart';
 
 /// A rounded device bezel that wraps any child as the "screen".
 /// Ratio ~2.05:1 (height:width). Shows a notch and a home indicator bar.
@@ -70,19 +69,6 @@ class PhoneFrame extends StatelessWidget {
                       bottomRight: Radius.circular(notchW * 0.18),
                     ),
                   ),
-                ),
-              ),
-            ),
-            // Status bar time
-            Positioned(
-              top: 4,
-              left: width * 0.08,
-              child: Text(
-                '9:41',
-                style: AppText.mono(
-                  size: 9,
-                  color: AppColors.textPrimary,
-                  spacing: 0,
                 ),
               ),
             ),

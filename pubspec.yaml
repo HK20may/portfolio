@@ -1,0 +1,46 @@
+name: portfolio
+description: "Harshit Kumawat — an animation-first Flutter portfolio with a live shader aurora."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management (feature-first Cubits)
+  flutter_bloc: ^8.1.6
+
+  # Routing (home + project detail with shared-element transitions)
+  go_router: ^14.2.1
+
+  # Typography
+  google_fonts: ^6.2.1
+
+  # Declarative entrance flourishes (used sparingly alongside hand-rolled controllers)
+  flutter_animate: ^4.5.0
+
+  # Scroll-triggered reveals + active-section tracking
+  visibility_detector: ^0.4.0+2
+
+  # Open mailto: and social links
+  url_launcher: ^6.3.0
+
+  # Live GitHub stats in the terminal
+  http: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # GLSL fragment shader powering the ambient aurora background.
+  shaders:
+    - shaders/aurora.frag
+    - shaders/aurora_lab.frag

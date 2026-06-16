@@ -21,49 +21,81 @@ class PricePoint {
 }
 
 class _TickerInfo {
-  const _TickerInfo({required this.code, required this.symbol, this.exchange});
+  const _TickerInfo({
+    required this.code,
+    required this.label,
+  });
   final String code;
-  final String symbol; // '₹' or '$'
-  final String? exchange; // e.g. 'NSE'
+  final String label; // display name shown in dropdown
+
+  String get symbol => r'$'; // all tickers are USD-denominated
 }
 
 const _tickers = [
-  _TickerInfo(code: 'RELIANCE', symbol: '₹', exchange: 'NSE'),
-  _TickerInfo(code: 'TCS', symbol: '₹', exchange: 'NSE'),
-  _TickerInfo(code: 'INFY', symbol: '₹', exchange: 'NSE'),
-  _TickerInfo(code: 'HDFCBANK', symbol: '₹', exchange: 'NSE'),
-  _TickerInfo(code: 'TATAMOTORS', symbol: '₹', exchange: 'NSE'),
-  _TickerInfo(code: 'AAPL', symbol: r'$'),
-  _TickerInfo(code: 'TSLA', symbol: r'$'),
-  _TickerInfo(code: 'NVDA', symbol: r'$'),
-  _TickerInfo(code: 'MSFT', symbol: r'$'),
+  // US equities
+  _TickerInfo(code: 'AAPL', label: 'AAPL — Apple'),
+  _TickerInfo(code: 'NVDA', label: 'NVDA — Nvidia'),
+  _TickerInfo(code: 'TSLA', label: 'TSLA — Tesla'),
+  _TickerInfo(code: 'MSFT', label: 'MSFT — Microsoft'),
+  _TickerInfo(code: 'GOOGL', label: 'GOOGL — Alphabet'),
+  _TickerInfo(code: 'META', label: 'META — Meta'),
+  _TickerInfo(code: 'AMZN', label: 'AMZN — Amazon'),
+  _TickerInfo(code: 'SPY', label: 'SPY — S&P 500 ETF'),
+  // Crypto
+  _TickerInfo(code: 'BTC/USD', label: 'BTC — Bitcoin'),
+  _TickerInfo(code: 'ETH/USD', label: 'ETH — Ethereum'),
 ];
 
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
 // Get a free key at https://twelvedata.com (800 req/day, CORS-enabled).
-const String _twelveDataKey = 'YOUR_FREE_API_KEY';
+const String _twelveDataKey = '35d85f0025214b6d86538857900ea945';
 
 Future<List<PricePoint>> fetchDailyCloses({
   required String symbol,
-  String? exchange,
   int outputsize = 400,
 }) async {
   final qp = {
     'symbol': symbol,
-    if (exchange != null) 'exchange': exchange,
     'interval': '1day',
     'outputsize': '$outputsize',
     'order': 'ASC',
     'apikey': _twelveDataKey,
   };
   final uri = Uri.https('api.twelvedata.com', '/time_series', qp);
-  final res = await http.get(uri);
-  final j = jsonDecode(res.body) as Map<String, dynamic>;
-  if (j['status'] == 'error' || j['values'] == null) {
-    throw Exception(j['message'] ?? 'price fetch failed');
+  debugPrint('[MonteCarlo] Fetching $symbol — URL: $uri');
+
+  late http.Response res;
+  try {
+    res = await http.get(uri).timeout(const Duration(seconds: 15));
+  } catch (e) {
+    debugPrint('[MonteCarlo] Network error for $symbol: $e');
+    rethrow;
   }
+
+  debugPrint('[MonteCarlo] HTTP ${res.statusCode} for $symbol');
+  debugPrint('[MonteCarlo] Body (first 500 chars): ${res.body.length > 500 ? res.body.substring(0, 500) : res.body}');
+
+  if (res.statusCode != 200) {
+    throw Exception('HTTP ${res.statusCode} for $symbol');
+  }
+
+  Map<String, dynamic> j;
+  try {
+    j = jsonDecode(res.body) as Map<String, dynamic>;
+  } catch (e) {
+    debugPrint('[MonteCarlo] JSON parse error for $symbol: $e');
+    throw Exception('Invalid JSON response for $symbol');
+  }
+
+  if (j['status'] == 'error' || j['values'] == null) {
+    final msg = j['message'] ?? j['code']?.toString() ?? 'price fetch failed';
+    debugPrint('[MonteCarlo] API error for $symbol: $msg — full response keys: ${j.keys.toList()}');
+    throw Exception('API error for $symbol: $msg');
+  }
+
   final values = (j['values'] as List).cast<Map<String, dynamic>>();
+  debugPrint('[MonteCarlo] Got ${values.length} candles for $symbol');
   return values
       .map((v) => PricePoint(
             DateTime.parse(v['datetime'] as String),
@@ -186,10 +218,7 @@ class _MonteCarloSimState extends State<MonteCarloSim>
     });
 
     try {
-      final data = await fetchDailyCloses(
-        symbol: _ticker.code,
-        exchange: _ticker.exchange,
-      );
+      final data = await fetchDailyCloses(symbol: _ticker.code);
       if (!mounted) return;
       final cal = calibrate(data);
       setState(() {
@@ -200,11 +229,13 @@ class _MonteCarloSimState extends State<MonteCarloSim>
         _fetchLoading = false;
       });
       await _runWithParams(s0: cal.s0, mu: cal.mu, sigma: cal.sigma);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[MonteCarlo] _fetchAndRun error: $e');
+      debugPrint('[MonteCarlo] Stack: $st');
       if (!mounted) return;
       setState(() {
         _fetchLoading = false;
-        _fetchError = 'Could not load ${_ticker.code} — using custom mode.';
+        _fetchError = 'Could not load ${_ticker.label.split(' ').first}: $e';
         _mode = _SimMode.custom;
       });
       _scheduleCompute();
@@ -330,8 +361,7 @@ class _MonteCarloSimState extends State<MonteCarloSim>
                   size: 11, color: AppColors.textTertiary, spacing: 0.5)),
           const SizedBox(height: 2),
           Text(value,
-              style: AppText.mono(
-                  size: 13, color: AppColors.cyan, spacing: 0)),
+              style: AppText.mono(size: 13, color: AppColors.cyan, spacing: 0)),
         ],
       );
 
@@ -517,8 +547,9 @@ class _MonteCarloSimState extends State<MonteCarloSim>
     );
 
     // ── Caption ──────────────────────────────────────────────────────────────
+    final tickerShort = _ticker.code.contains('/') ? _ticker.code.split('/')[0] : _ticker.code;
     final caption = _mode == _SimMode.real && _history != null
-        ? 'Calibrated on ${_history!.length} days of real ${_ticker.code} prices'
+        ? 'Calibrated on ${_history!.length} days of real $tickerShort prices'
             ' · forward paths computed in a background isolate'
         : kIsWeb
             ? 'Geometric Brownian Motion · ${_sims.round()} simulations'
@@ -536,7 +567,9 @@ class _MonteCarloSimState extends State<MonteCarloSim>
             child: Text(
               _fetchError!,
               style: AppText.mono(
-                  size: 11, color: AppColors.amber.withValues(alpha: 0.9), spacing: 0),
+                  size: 11,
+                  color: AppColors.amber.withValues(alpha: 0.9),
+                  spacing: 0),
             ),
           ),
         if (_computing)
@@ -596,7 +629,9 @@ class _ModeChip extends StatelessWidget {
               : AppColors.glassHigh,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? AppColors.mint.withValues(alpha: 0.5) : AppColors.border,
+            color: active
+                ? AppColors.mint.withValues(alpha: 0.5)
+                : AppColors.border,
           ),
         ),
         child: Text(
@@ -645,7 +680,7 @@ class _TickerDropdown extends StatelessWidget {
             .map((t) => DropdownMenuItem<_TickerInfo>(
                   value: t,
                   child: Text(
-                    '${t.symbol} ${t.code}',
+                    t.label,
                     style: AppText.mono(
                         size: 13, color: AppColors.textPrimary, spacing: 0),
                   ),
@@ -687,12 +722,10 @@ class _CombinedPainter extends CustomPainter {
     if (totalN <= 1) return;
 
     // Overall value range
-    var minV = history.isNotEmpty
-        ? history.reduce(min)
-        : result.meanPath.reduce(min);
-    var maxV = history.isNotEmpty
-        ? history.reduce(max)
-        : result.meanPath.reduce(max);
+    var minV =
+        history.isNotEmpty ? history.reduce(min) : result.meanPath.reduce(min);
+    var maxV =
+        history.isNotEmpty ? history.reduce(max) : result.meanPath.reduce(max);
     for (final path in result.samplePaths) {
       for (final v in path) {
         if (v < minV) minV = v;
@@ -812,7 +845,8 @@ class _HistPainter extends CustomPainter {
     final range = maxV - minV;
     final counts = List<int>.filled(buckets, 0);
     for (final p in prices) {
-      final idx = ((p - minV) / range * (buckets - 1)).round().clamp(0, buckets - 1);
+      final idx =
+          ((p - minV) / range * (buckets - 1)).round().clamp(0, buckets - 1);
       counts[idx]++;
     }
     final maxC = counts.reduce(max).toDouble();
@@ -822,7 +856,8 @@ class _HistPainter extends CustomPainter {
       final r = Rect.fromLTWH(i * bw + 1, size.height - h, bw - 2, h);
       canvas.drawRRect(
         RRect.fromRectAndRadius(r, const Radius.circular(2)),
-        Paint()..color = accent.withValues(alpha: 0.45 + 0.4 * (counts[i] / maxC)),
+        Paint()
+          ..color = accent.withValues(alpha: 0.45 + 0.4 * (counts[i] / maxC)),
       );
     }
   }
@@ -860,7 +895,8 @@ class _StatsStrip extends StatelessWidget {
         stat('Median', fmt(result.median)),
         stat('P5', fmt(result.p5)),
         stat('P95', fmt(result.p95)),
-        stat('Prob. Profit', '${(result.probProfit * 100).toStringAsFixed(1)}%'),
+        stat(
+            'Prob. Profit', '${(result.probProfit * 100).toStringAsFixed(1)}%'),
       ],
     );
   }

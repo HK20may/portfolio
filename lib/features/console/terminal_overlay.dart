@@ -538,6 +538,7 @@ class _MatrixRain extends StatefulWidget {
 class _MatrixRainState extends State<_MatrixRain>
     with SingleTickerProviderStateMixin {
   late final Ticker _ticker;
+  final FocusNode _focusNode = FocusNode();
   final List<_Column> _columns = [];
   Duration _last = Duration.zero;
   double _elapsed = 0;
@@ -583,6 +584,7 @@ class _MatrixRainState extends State<_MatrixRain>
   @override
   void dispose() {
     _ticker.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -591,7 +593,7 @@ class _MatrixRainState extends State<_MatrixRain>
     return GestureDetector(
       onTap: widget.onDismiss,
       child: KeyboardListener(
-        focusNode: FocusNode()..requestFocus(),
+        focusNode: _focusNode,
         autofocus: true,
         onKeyEvent: (_) => widget.onDismiss(),
         child: ColoredBox(

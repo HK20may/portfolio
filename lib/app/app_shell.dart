@@ -7,6 +7,25 @@ import '../features/console/game_registry.dart';
 import '../features/console/terminal_overlay.dart';
 import '../state/console_cubit.dart';
 
+/// Focus-traversal policy that skips any node whose render object hasn't been
+/// laid out yet. Prevents the "RenderBox was not laid out" assertion that fires
+/// when the browser fires a focus event before Flutter's first layout pass
+/// completes (e.g. on initial load or after a GoRouter page transition).
+class _SafeTraversalPolicy extends ReadingOrderTraversalPolicy {
+  @override
+  Iterable<FocusNode> sortDescendants(
+      Iterable<FocusNode> descendants, FocusNode currentNode) {
+    return super.sortDescendants(
+      descendants.where((node) {
+        final obj = node.context?.findRenderObject();
+        if (obj == null || !obj.attached) return false;
+        return obj is! RenderBox || obj.hasSize;
+      }),
+      currentNode,
+    );
+  }
+}
+
 /// Global shell mounted above the routed pages. Provides:
 ///   • Cmd-K / Ctrl-K → command palette
 ///   • Konami code (↑↑↓↓←→←→BA) via HardwareKeyboard — never steals focus
@@ -69,35 +88,38 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
-            () => context.read<ConsoleCubit>().togglePalette(),
-        const SingleActivator(LogicalKeyboardKey.keyK, control: true):
-            () => context.read<ConsoleCubit>().togglePalette(),
-      },
-      child: Focus(
-        autofocus: true,
-        child: BlocBuilder<ConsoleCubit, ConsoleState>(
-          builder: (context, state) {
-            final view = state.view;
-            return Stack(
-              children: [
-                widget.child,
-                if (view != ConsoleView.none)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: () => context.read<ConsoleCubit>().dismiss(),
-                      child: const ColoredBox(color: Color(0x99000000)),
+    return FocusTraversalGroup(
+      policy: _SafeTraversalPolicy(),
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+              () => context.read<ConsoleCubit>().togglePalette(),
+          const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+              () => context.read<ConsoleCubit>().togglePalette(),
+        },
+        child: Focus(
+          autofocus: true,
+          child: BlocBuilder<ConsoleCubit, ConsoleState>(
+            builder: (context, state) {
+              final view = state.view;
+              return Stack(
+                children: [
+                  widget.child,
+                  if (view != ConsoleView.none)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: () => context.read<ConsoleCubit>().dismiss(),
+                        child: const ColoredBox(color: Color(0x99000000)),
+                      ),
                     ),
-                  ),
-                if (view != ConsoleView.none)
-                  Positioned.fill(
-                    child: _OverlayBody(state: state),
-                  ),
-              ],
-            );
-          },
+                  if (view != ConsoleView.none)
+                    Positioned.fill(
+                      child: _OverlayBody(state: state),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

@@ -7,12 +7,13 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text.dart';
 import '../../core/utils/launch.dart';
 import '../../shared/widgets/aurora_background.dart';
+import '../../shared/widgets/glass_container.dart';
 import '../../shared/widgets/grain_overlay.dart';
 import '../../shared/widgets/magnetic_button.dart';
 import '../../shared/widgets/pills.dart';
 import '../../shared/cursor/cursor_scope.dart';
 import '../home/sections/work_section.dart' show ProjectVisual;
-import '../lab/monte_carlo/monte_carlo_sim.dart';
+import 'project_demos.dart';
 
 class ProjectDetailPage extends StatelessWidget {
   const ProjectDetailPage({super.key, required this.id});
@@ -64,82 +65,141 @@ class ProjectDetailPage extends StatelessWidget {
 
 class _Detail extends StatelessWidget {
   const _Detail({required this.project, required this.onBack});
-  final dynamic project; // Project
+  final dynamic project;
   final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
+    final titleSize =
+        context.responsive<double>(mobile: 38, tablet: 52, desktop: 64);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Back ────────────────────────────────────────────────────────────
         _BackButton(onTap: onBack),
         const SizedBox(height: Insets.xl),
+
+        // ── Context / Title / Subtitle ───────────────────────────────────
         Text(
-          project.context,
-          style: AppText.mono(size: 13, color: project.accent),
+          project.context as String,
+          style: AppText.mono(size: 13, color: project.accent as Color),
         ),
         const SizedBox(height: Insets.md),
         Text(
-          project.title,
+          project.title as String,
           style: AppText.display(
-            size: context.responsive<double>(mobile: 40, tablet: 56, desktop: 68),
+            size: titleSize,
             weight: FontWeight.w800,
             height: 1.02,
           ),
         ),
         const SizedBox(height: Insets.sm),
         Text(
-          project.subtitle,
+          project.subtitle as String,
           style: AppText.body(
             size: context.responsive<double>(mobile: 17, desktop: 20),
             color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: Insets.xl),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(Corners.lg),
-          child: ProjectVisual(
-            project: project,
-            height: context.responsive<double>(mobile: 200, desktop: 320),
+
+        // ── Slim Hero accent band (preserves Hero tag for card→detail flight)
+        Hero(
+          tag: 'project-${project.id}',
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  (project.accent as Color).withOpacity(0.32),
+                  Colors.transparent,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(Corners.lg),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: Insets.lg),
+            child: Row(
+              children: [
+                if (project.metric != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0x33000000),
+                      borderRadius: BorderRadius.circular(Corners.pill),
+                      border: Border.all(color: AppColors.borderStrong),
+                    ),
+                    child: Text(
+                      project.metric as String,
+                      style: AppText.mono(
+                          size: 12, color: AppColors.textPrimary, spacing: 0.5),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                Text(
+                  project.year as String,
+                  style: AppText.mono(
+                      size: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: Insets.xxl),
+
+        // ── About ────────────────────────────────────────────────────────
+        Text('About',
+            style: AppText.display(size: 22, weight: FontWeight.w700)),
+        const SizedBox(height: Insets.lg),
         Text(
-          project.description,
+          project.description as String,
           style: AppText.body(
             size: context.responsive<double>(mobile: 16, desktop: 18),
             color: AppColors.textSecondary,
-            height: 1.7,
+            height: 1.75,
           ),
         ),
         const SizedBox(height: Insets.xxl),
-        if (project.id == 'stock-prediction') ...[
-          Text(
-            'Live Demo',
-            style: AppText.display(size: 22, weight: FontWeight.w700),
-          ),
+
+        // ── Live Demo ────────────────────────────────────────────────────
+        if (ProjectDemos.has(project.id as String)) ...[
+          Text('Live Demo',
+              style: AppText.display(size: 22, weight: FontWeight.w700)),
           const SizedBox(height: Insets.lg),
-          const MonteCarloSim(),
+          GlassContainer(
+            padding: const EdgeInsets.all(Insets.lg),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: context.responsive<double>(
+                    mobile: 500, tablet: 580, desktop: 640),
+              ),
+              child: ProjectDemos.build(context, project.id as String)!,
+            ),
+          ),
           const SizedBox(height: Insets.xxl),
         ],
-        Text(
-          'Highlights',
-          style: AppText.display(size: 22, weight: FontWeight.w700),
-        ),
+
+        // ── Highlights ───────────────────────────────────────────────────
+        Text('Highlights',
+            style: AppText.display(size: 22, weight: FontWeight.w700)),
         const SizedBox(height: Insets.lg),
-        for (final h in project.highlights)
+        for (final h in project.highlights as List<String>)
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding: const EdgeInsets.only(top: 8, right: 14),
                   child: Container(
-                    width: 7,
-                    height: 7,
+                    width: 6,
+                    height: 6,
                     decoration: BoxDecoration(
-                      color: project.accent,
+                      color: project.accent as Color,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -150,7 +210,7 @@ class _Detail extends StatelessWidget {
                     style: AppText.body(
                       size: 16,
                       color: AppColors.textSecondary,
-                      height: 1.6,
+                      height: 1.65,
                     ),
                   ),
                 ),
@@ -158,21 +218,26 @@ class _Detail extends StatelessWidget {
             ),
           ),
         const SizedBox(height: Insets.xl),
+
+        // ── Tags ─────────────────────────────────────────────────────────
         Wrap(
           spacing: 10,
           runSpacing: 10,
           children: [
-            for (final t in project.tags) TagPill(t, accent: project.accent),
+            for (final t in project.tags as List<String>)
+              TagPill(t, accent: project.accent as Color),
           ],
         ),
         const SizedBox(height: Insets.xxl),
+
+        // ── CTAs ─────────────────────────────────────────────────────────
         Wrap(
           spacing: Insets.md,
           runSpacing: Insets.md,
           children: [
-            if (project.id == 'stock-prediction')
+            if ((project.id as String) == 'stock-prediction')
               MagneticButton(
-                label: 'Run it live →',
+                label: 'Full simulator →',
                 filled: true,
                 icon: Icons.science_outlined,
                 onPressed: () => context.go('/lab'),
@@ -180,12 +245,15 @@ class _Detail extends StatelessWidget {
             if (project.link != null)
               MagneticButton(
                 label: 'View on GitHub',
-                filled: project.id != 'stock-prediction',
+                filled: (project.id as String) != 'stock-prediction',
                 icon: Icons.arrow_outward_rounded,
                 onPressed: () => openUrl(project.link as String),
               ),
-            if (project.link == null && project.metric != null)
-              TagPill(project.metric as String, accent: project.accent),
+            MagneticButton(
+              label: 'Explore the Lab →',
+              icon: Icons.science_rounded,
+              onPressed: () => context.go('/lab'),
+            ),
           ],
         ),
       ],

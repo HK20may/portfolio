@@ -11,6 +11,7 @@ import '../../../shared/widgets/pills.dart';
 import '../../../shared/widgets/reveal_on_scroll.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../../shared/widgets/tilt_card.dart';
+import '../../work/project_demos.dart';
 
 class WorkSection extends StatelessWidget {
   const WorkSection({super.key});
@@ -160,6 +161,36 @@ class _ProjectCardState extends State<ProjectCard>
                         children: [
                           for (final tag in widget.project.tags.take(4))
                             TagPill(tag),
+                          if (ProjectDemos.has(widget.project.id))
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: widget.project.accent.withOpacity(0.14),
+                                borderRadius:
+                                    BorderRadius.circular(Corners.pill),
+                                border: Border.all(
+                                    color:
+                                        widget.project.accent.withOpacity(0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.play_circle_outline_rounded,
+                                      size: 12,
+                                      color: widget.project.accent),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Live demo',
+                                    style: AppText.mono(
+                                      size: 10,
+                                      color: widget.project.accent,
+                                      spacing: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: Insets.lg),

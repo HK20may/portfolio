@@ -12,8 +12,8 @@ abstract final class PortfolioData {
       'Motion & UI Craftsman',
     ],
     tagline:
-        'I build cross-platform apps that feel alive — shipped to state '
-        'governments and to millions of everyday users.',
+        'I build cross-platform products people actually feel — '
+        'now going full-stack.',
     about: [
       'I\'m a Flutter developer with 4+ years turning ambitious product ideas '
           'into fast, fluid apps across Android, iOS, web and desktop. I care '
@@ -26,6 +26,9 @@ abstract final class PortfolioData {
           'quick-commerce app that crossed a million. I lean on Clean '
           'Architecture and disciplined state management so polish never comes '
           'at the cost of maintainability.',
+      'Currently expanding into backend engineering with Go — building REST '
+          'and gRPC services, working with PostgreSQL and Docker. The same '
+          'care I put into UI motion goes into API design.',
     ],
     location: 'Jaipur, India',
     email: 'HK20may@gmail.com',
@@ -77,6 +80,18 @@ abstract final class PortfolioData {
         'Git',
         'CI/CD',
         'Codemagic',
+      ],
+    ),
+    SkillGroup(
+      title: 'Backend & Systems',
+      items: [
+        'Go (learning)',
+        'REST',
+        'gRPC',
+        'PostgreSQL',
+        'Docker',
+        'Firebase',
+        'WebSockets',
       ],
     ),
   ];
@@ -174,16 +189,30 @@ abstract final class PortfolioData {
       subtitle: 'Government smart-metering, in citizens\' pockets',
       context: 'Polaris · Android, iOS & Web',
       description:
-          'Cross-platform apps for the Uttar Pradesh and Manipur governments '
-          'that let smart-meter users monitor consumption, recharge and access '
-          'connection services. Built on Clean Architecture with the full '
-          'Firebase suite and real-time feature toggling via Remote Config.',
+          'The Polaris Smart Energy Platform brings electricity connection '
+          'management to mobile and web for the Uttar Pradesh and Manipur '
+          'state governments. I built the complete cross-platform suite — '
+          'Android, iOS, and a responsive Flutter Web app — on a BLoC + '
+          'Clean Architecture backbone, serving metered households at scale. '
+          'The app handles real-time consumption monitoring, prepaid '
+          'recharges, service requests, and outage reporting across every '
+          'device class, with the full Firebase suite wired in for '
+          'reliability and feature agility.',
       year: '2024',
       tags: ['Flutter', 'BLoC', 'Clean Architecture', 'Firebase', 'Security'],
       highlights: [
-        'Android, iOS and a responsive Flutter Web build from one codebase',
-        'Remote Config-driven personalisation without app updates',
-        'Secure storage, encryption and privacy-compliant comms',
+        'Single Flutter codebase shipped to Android, iOS, and Flutter Web '
+            'across two state governments at scale',
+        'BLoC + Clean Architecture: feature modules, repository pattern, '
+            'and strict use-case boundaries for long-term maintainability',
+        'Full Firebase suite: Crashlytics, Analytics, Push, In-App '
+            'Messaging, Performance Monitoring, and Remote Config',
+        'Remote Config feature flags let the ops team toggle UX per state '
+            'without requiring a new release',
+        'Secure local storage with AES encryption; privacy-compliant data '
+            'handling following government guidelines',
+        'Responsive layouts tested from 4" budget phones to 27" desktop '
+            'browsers with a single layout system',
       ],
       accent: AppColors.violet,
       metric: 'Statewide rollout',
@@ -194,16 +223,27 @@ abstract final class PortfolioData {
       subtitle: 'SaaS commerce, everywhere a business sells',
       context: 'NowFloats · Android, iOS, Web & Desktop',
       description:
-          'A SaaS commerce app I led across four platforms. The hard parts '
-          'lived in the data layer: search, filtering and pagination over live '
-          'observable streams, plus isolate-backed processing to keep the UI '
-          'buttery under load.',
+          'Zadinga is a SaaS commerce platform that empowers SMBs to run '
+          'their online stores. I was the sole mobile lead at NowFloats, '
+          'owning the Flutter app across all four platforms — Android, iOS, '
+          'web, and desktop. The most demanding technical work was the data '
+          'layer: live-observable product and order streams backed by '
+          'reactive GetX state management, isolate-backed search to keep the '
+          'main thread free, and a sophisticated filter/sort/pagination '
+          'engine that stayed buttery under thousands of SKUs.',
       year: '2023',
       tags: ['Flutter', 'GetX', 'MVVM', 'Isolates', 'Payments'],
       highlights: [
-        '50k+ downloads across Play Store, App Store and web',
-        'Live search, filtering and pagination on observable data',
-        'Force & Flexible in-app updates with CI/CD',
+        '50k+ downloads across Play Store, App Store, web, and desktop '
+            'from a single Flutter codebase',
+        'Live search, multi-dimensional filtering, and cursor-based '
+            'pagination over GetX observables — never a jank frame',
+        'Background Isolate processing for heavy list operations so the '
+            'UI thread stays at 60 fps regardless of catalogue size',
+        'Force & Flexible in-app update flows with gradual rollout '
+            'managed through Azure and Firebase CI/CD pipelines',
+        'MVVM + GetX module architecture that two new engineers could '
+            'onboard to and ship features in their first week',
       ],
       accent: AppColors.cyan,
       metric: '50k+ downloads',
@@ -214,16 +254,26 @@ abstract final class PortfolioData {
       subtitle: 'Quick-commerce groceries at a million-plus scale',
       context: 'Fraazo · Android & iOS',
       description:
-          'Features for a quick-commerce FMCG app that crossed a million '
-          'downloads. Responsive, adaptive UIs paired with Firebase-driven '
-          'engagement — deep links, push, Crashlytics and A/B testing — under '
-          'a Riverpod + MVC structure.',
+          'Fraazo was a quick-commerce startup delivering fresh produce in '
+          'under 30 minutes across metro India. I built and shipped '
+          'consumer-facing features for the app as it scaled past a million '
+          'downloads. My work spanned adaptive product catalog layouts, '
+          'deep-link attribution for growth campaigns, Firebase A/B '
+          'experiments, and a real-time order tracker that updated live '
+          'as the delivery partner moved toward the customer.',
       year: '2022',
-      tags: ['Flutter', 'Riverpod', 'A/B Testing', 'Deep Links'],
+      tags: ['Flutter', 'Riverpod', 'A/B Testing', 'Deep Links', 'Testing'],
       highlights: [
-        '1M+ downloads on a fast-moving consumer app',
-        'Adaptive layouts across every screen size',
-        'A/B testing and deep links for growth',
+        '1M+ downloads on a fast-moving consumer app with a zero-crash SLA '
+            'maintained through Crashlytics monitoring',
+        'Adaptive product catalog grid for every screen from 4" budget '
+            'phones to 10" tablets without separate layout code',
+        'Firebase A/B testing across multiple concurrent experiments '
+            'driving measurable engagement and conversion uplift',
+        'Deep link integration enabling social sharing, referral '
+            'incentives, and re-engagement push campaigns',
+        'Riverpod + MVC structure with full unit-test coverage of '
+            'business logic and critical cart/checkout flows',
       ],
       accent: AppColors.pink,
       metric: '1M+ downloads',
@@ -234,37 +284,90 @@ abstract final class PortfolioData {
       subtitle: 'Modelling tomorrow\'s prices with Monte Carlo',
       context: 'Personal · Python',
       description:
-          'A simulation engine that estimates future stock prices using Monte '
-          'Carlo methods over Geometric Brownian Motion, calibrated on '
-          'historical data to produce probabilistic forecasts.',
+          'A Monte Carlo simulation engine for probabilistic stock price '
+          'forecasting. The model calibrates annualised drift (μ) and '
+          'volatility (σ) from historical daily log-returns, then runs '
+          'hundreds of Geometric Brownian Motion paths forward in time. '
+          'The Flutter frontend here fetches live closing prices from '
+          'Twelvedata (NSE and US tickers) and runs the simulation off the '
+          'main thread in a Dart isolate, rendering all paths and the '
+          'P5–P95 confidence cone in a single-canvas CustomPainter.',
       year: '2022',
       tags: ['Python', 'Monte Carlo', 'GBM', 'Quant'],
       highlights: [
-        'Geometric Brownian Motion price paths',
-        'Monte Carlo simulation over historical data',
-        'Probabilistic forecasting',
+        'GBM model auto-calibrates μ and σ from up to 400 days of '
+            'historical log-returns fetched from Twelvedata API',
+        '300+ Monte Carlo paths computed in a Dart background isolate — '
+            'the UI never drops a frame during simulation',
+        'P5–P95 confidence cone and mean path rendered in one draw call '
+            'via a custom CombinedPainter canvas',
+        'Live NSE (₹) and US (\$) ticker support with currency-aware '
+            'formatting and graceful offline fallback',
       ],
       accent: AppColors.mint,
       link: 'https://github.com/HK20may',
     ),
     Project(
-      id: 'foodie',
-      title: 'Foodie',
-      subtitle: 'A food-delivery app with three sides to the story',
-      context: 'Personal · Java & Android',
+      id: 'sorting-visualizer',
+      title: 'Sorting Visualizer',
+      subtitle: 'Watch algorithms race through data',
+      context: 'Personal · Flutter',
       description:
-          'A native Android food-delivery app modelling the full marketplace: '
-          'customers place orders, chefs accept or reject them, and delivery '
-          'partners pick up and deliver — each role with its own flow.',
-      year: '2021',
-      tags: ['Java', 'Android', 'Realtime', 'Marketplace'],
+          'An interactive educational tool for understanding sorting '
+          'algorithms. Five classic algorithms — Bubble, Selection, '
+          'Insertion, Quick, and Merge — are implemented as step generators '
+          'that pre-record every comparison, swap, and overwrite. A Ticker '
+          'replays the steps at user-controlled speed in a CustomPainter '
+          'canvas. Comparing bars light amber, swaps flash pink, and '
+          'settled elements turn mint, giving each algorithm a distinct '
+          'visual signature that makes its character immediately readable.',
+      year: '2024',
+      tags: ['Flutter', 'CustomPainter', 'Algorithms', 'Animation'],
       highlights: [
-        'Customer, chef and delivery-partner roles',
-        'Order lifecycle from placement to delivery',
-        'Native Android with Java',
+        'Five algorithm implementations: Bubble, Selection, Insertion, '
+            'Quick Sort (Lomuto partition), and Merge Sort',
+        'Step-generator pattern pre-computes all operations; rendering '
+            'and algorithm logic are fully decoupled',
+        'Adjustable speed from 10 to 250 steps/second — slow enough '
+            'to trace by eye, fast enough to race algorithms',
+        'Live status line narrates each step in plain English, making '
+            'the logic transparent to non-CS audiences',
+        'Bar value labels and per-algorithm blurb turn it into a '
+            'self-contained learning tool',
       ],
       accent: AppColors.amber,
-      link: 'https://github.com/HK20may',
+      metric: '5 algorithms',
+    ),
+    Project(
+      id: 'pathfinding',
+      title: 'Pathfinding Visualizer',
+      subtitle: 'A* finds its way through any maze you draw',
+      context: 'Personal · Flutter',
+      description:
+          'An interactive grid-based pathfinding explorer. Drag to paint '
+          'walls in real time, then run A*, Dijkstra, or BFS to watch '
+          'the algorithm explore the grid cell by cell. Frontier cells '
+          'pulse amber as they are queued, visited cells fill violet as '
+          'the algorithm marches outward, and the optimal path traces '
+          'cyan once the goal is reached. All search logic is pre-run '
+          'and its events replayed at a configurable frame rate by a '
+          'Ticker, fully decoupling algorithm from rendering.',
+      year: '2024',
+      tags: ['Flutter', 'A*', 'Graphs', 'Animation'],
+      highlights: [
+        'Three search algorithms: A* (Manhattan heuristic), Dijkstra '
+            '(uniform cost, h = 0), and BFS (breadth-first queue)',
+        'Drag-to-paint walls with automatic draw/erase mode toggle '
+            'for fluid maze creation before running any search',
+        'Stepwise event replay at adjustable speed fully decouples '
+            'the search algorithm from the animation layer',
+        'Five visually distinct cell states — start, goal, frontier, '
+            'visited, and path — each distinctly colour-coded',
+        'Full path reconstruction via a cameFrom map; reports "No '
+            'path found" clearly when the goal is unreachable',
+      ],
+      accent: AppColors.mint,
+      metric: 'A* · Dijkstra · BFS',
     ),
   ];
 

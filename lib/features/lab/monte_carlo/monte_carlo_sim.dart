@@ -102,7 +102,10 @@ enum _SimMode { real, custom }
 // ── Widget ────────────────────────────────────────────────────────────────────
 
 class MonteCarloSim extends StatefulWidget {
-  const MonteCarloSim({super.key});
+  const MonteCarloSim({super.key, this.compact = false});
+
+  /// When true, reduces chart height for embedding in a detail-page demo block.
+  final bool compact;
 
   @override
   State<MonteCarloSim> createState() => _MonteCarloSimState();
@@ -469,7 +472,7 @@ class _MonteCarloSimState extends State<MonteCarloSim>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              height: 220,
+              height: widget.compact ? 160 : 220,
               child: _fetchLoading
                   ? const Center(
                       child: CircularProgressIndicator(

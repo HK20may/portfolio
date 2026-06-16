@@ -12,12 +12,16 @@ import '../../shared/widgets/nav_bar.dart';
 import '../../shared/widgets/reveal_on_scroll.dart';
 import '../../state/navigation_cubit.dart';
 import '../../state/scroll_intent_cubit.dart';
+import '../../features/guestbook/guestbook_section.dart';
 import 'monte_carlo/monte_carlo_sim.dart';
 import 'widgets/boids_field.dart';
 import 'widgets/dot_matrix.dart';
 import 'widgets/draw_canvas.dart';
 import 'widgets/particle_field.dart';
+import 'widgets/pathfinding_visualizer.dart';
+import 'widgets/realtime_dashboard.dart';
 import 'widgets/shader_lab.dart';
+import 'widgets/sorting_visualizer.dart';
 
 class LabPage extends StatelessWidget {
   const LabPage({super.key});
@@ -134,6 +138,32 @@ class LabPage extends StatelessWidget {
                           title: 'Generative Canvas',
                           caption: 'Drag to paint — fading trails',
                           child: DrawCanvas(),
+                        ),
+                        const SizedBox(height: Insets.xxl),
+                        const _Exhibit(
+                          title: 'Sorting Visualizer',
+                          caption:
+                              'Sorting visualizer — step generators + a custom-painted animation loop',
+                          child: SortingVisualizer(),
+                        ),
+                        const SizedBox(height: Insets.xxl),
+                        const _Exhibit(
+                          title: 'Pathfinding Visualizer',
+                          caption: 'A* pathfinding — draw walls, watch the search',
+                          child: PathfindingVisualizer(),
+                        ),
+                        const SizedBox(height: Insets.xxl),
+                        const _Exhibit(
+                          title: 'Realtime Dashboard',
+                          caption: 'Realtime dashboard — streams + custom charts',
+                          child: RealtimeDashboard(),
+                        ),
+                        const SizedBox(height: Insets.xxl),
+                        const _Exhibit(
+                          title: 'Guestbook',
+                          caption:
+                              'Live guestbook — real-time, backed by Firestore when configured',
+                          child: GuestbookSection(),
                         ),
                         SizedBox(
                             height: context.responsive(
